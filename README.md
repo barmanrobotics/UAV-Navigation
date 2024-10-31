@@ -1,4 +1,4 @@
-# UAV Command Stack
+# UAV Navigation
 
 1. Directory containing premade commands
 
