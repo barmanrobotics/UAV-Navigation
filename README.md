@@ -1,5 +1,5 @@
 # UAV Navigation
 
-1. Directory containing premade commands
+1. remote-commands: directory containing premade commands
 
-2. Directory containing complete scripts for missions
+2. mission-scripts: Directory containing complete scripts for missions
