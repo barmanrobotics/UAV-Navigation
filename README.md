@@ -1,2 +1,5 @@
-# A.S.C.E.N.D-Project
-Complete repository for Barman Robotics. 
+# UAV Command Stack
+
+1. Directory containing premade commands
+
+2. Directory containing complete scripts for missions
