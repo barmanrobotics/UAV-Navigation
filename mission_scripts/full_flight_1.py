@@ -140,6 +140,40 @@ def get_distance_meters(lat1, lon1, lat2, lon2):
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c
 
+def loiter_for_time(duration, altitude):
+    """
+    Make the drone loiter at the current location for the specified duration (in seconds).
+
+    :param duration: Time to loiter in seconds
+    :param altitude: Altitude to maintain during loitering (in meters)
+    """
+    print(f"Loitering for {duration} seconds at altitude {altitude} meters.")
+
+    # Send MAVLink loiter command (MAV_CMD_NAV_LOITER_TIME)
+    # Loiter command is to hold at the current position for the specified time (time in seconds)
+    connection.mav.command_long_send(
+        connection.target_system, 
+        connection.target_component,
+        mavutil.mavlink.MAV_CMD_NAV_LOITER_TIME,  # Loiter command
+        0,  # Confirmation (set to 0)
+        0,  # Param 1: Latitude (0 for loiter at current position)
+        0,  # Param 2: Longitude (0 for loiter at current position)
+        altitude,  # Param 3: Altitude (altitude to loiter at)
+        0,  # Param 4: Time in seconds (we'll use duration below)
+        0,  # Param 5: Reserved (set to 0)
+        0,  # Param 6: Reserved (set to 0)
+        0   # Param 7: Reserved (set to 0)
+    )
+
+    # Wait for the drone to complete the loitering duration
+    start_time = time.time()
+    while True:
+        elapsed_time = time.time() - start_time
+        if elapsed_time >= duration:
+            print("Loitering complete.")
+            break
+        time.sleep(1)
+
 
 def get_location():
     msg = connection.recv_match(type='GLOBAL_POSITION_INT', blocking=True)
@@ -151,6 +185,29 @@ def get_location():
         return latitude, longitude
     else:
         return None, None
+    
+
+def return_to_launch():
+    """
+    Command the drone to return to its launch (takeoff) location.
+    """
+    print("Returning to launch (RTL)...")
+    
+    # Send MAVLink RTL command (MAV_CMD_NAV_RETURN_TO_LAUNCH)
+    connection.mav.command_long_send(
+        connection.target_system, 
+        connection.target_component,
+        mavutil.mavlink.MAV_CMD_NAV_RETURN_TO_LAUNCH,  # RTL command
+        0,  # Confirmation (set to 0)
+        0,  # Param 1: Not used
+        0,  # Param 2: Not used
+        0,  # Param 3: Not used
+        0,  # Param 4: Reserved
+        0,  # Param 5: Reserved
+        0,  # Param 6: Reserved
+        0   # Param 7: Reserved
+    )
+
 
 # Store takeoff position
 lat_takeoff, lon_takeoff = None, None
@@ -165,3 +222,11 @@ lat_takeoff, lon_takeoff = get_location()
 
 # Now fly to the target relative location
 fly_relative_distance(target_distance, target_angle, target_alt)
+
+# Begin loiter, allow for specification of time and altitude
+loiter_time = float(input("Enter loiter time (s): "))
+loiter_alt = float(input("Enter target altitude for loiter(meters): "))
+loiter_for_time(loiter_time, loiter_alt)
+
+#return to launch and end mission
+return_to_launch()
