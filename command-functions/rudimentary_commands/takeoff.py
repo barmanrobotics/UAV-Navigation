@@ -1,4 +1,4 @@
-from pymavlink import mavutil
+from pymavlink import mavutil # type: ignore
 
 # Start a connection listening to a UDP port
 the_connection = mavutil.mavlink_connection('udpin:localhost:14550')
