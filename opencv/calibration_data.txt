@@ -1,7 +1,19 @@
+Please use the theoretical values for now. This file will be updated later.
+
+Theoretically calculated values:
 Camera Matrix:
-3304.74173631 0.00000000 2250.15430808
-0.00000000 3317.15405795 1108.87277414
-0.00000000 0.00000000 1.00000000
+[[1128.7813953488373, 0, 768.5], [0, 1128.1983471074382, 432.5], [0, 0, 1]]
 
 Distortion Coefficients:
-0.00548862 0.12807064 -0.01048389 -0.00508286 -0.27971602
+[0.0,0.0,0.0,0.0,0.0]
+
+
+Calibration values: (Sungwoo) #Do not use. Tested in simulation and pose estimation was wrong
+Camera Matrix:
+[[3304.74173631,0.00000000,2250.15430808],[0.00000000,3317.15405795,1108.87277414],[0.00000000,0.00000000,1.00000000]]
+
+Distortion Coefficients:
+[0.00548862 0.12807064 -0.01048389 -0.00508286 -0.27971602]
+
+
+
