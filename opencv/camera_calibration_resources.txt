@@ -1,0 +1,7 @@
+https://docs.opencv.org/4.x/dc/dbb/tutorial_py_calibration.html
+
+https://www.youtube.com/watch?v=_-BTKiamRTg
+
+If you want to know the theory
+
+https://www.youtube.com/watch?v=qByYk6JggQU&list=PL2zRqk16wsdoCCLpou-dGo7QQNks1Ppzo&index=2
