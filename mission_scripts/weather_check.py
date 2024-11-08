@@ -47,7 +47,10 @@ def check_weather(lat_takeoff, lon_takeoff):
     hourly_visibility = hourly.Variables(0).ValuesAsNumpy()
     hourly_wind_speed_10 = hourly.Variables(1).ValuesAsNumpy()
     hourly_precipitation = hourly.Variables(2).ValuesAsNumpy()
-    
+    print(hourly_precipitation)
+    print(hourly_visibility)
+    print(hourly_wind_speed_10)
+
     # order data to be printed
     hourly_data = {}
     hourly_data["wind speed 10m"] = hourly_wind_speed_10

@@ -1,6 +1,6 @@
 # Owen Bartlett
 # This function sets the drone to loiter for a certain amount of turns at a specific altitude
-
+## MAY BE FAULTY IMPLEMENTATION ##
 import pymavlink as mavutil
 import time
 import math
