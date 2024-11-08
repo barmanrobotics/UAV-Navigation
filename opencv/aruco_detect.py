@@ -4,6 +4,7 @@ import socket
 import struct
 import numpy as np
 import math
+import time
 
 # connect to WebotsArduVehicle
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -32,7 +33,11 @@ def detect_aruco_tags():
     o_x = (x_res/2) + 0.5
     o_y = (y_res/2) + 0.5
     camera_matrix = [[f_x,0,o_x],[0,f_y,o_y],[0,0,1]]
+    print (camera_matrix)
+    time.sleep(10)
+    #camera_matrix = [[3304.74173631,0.00000000,2250.15430808],[0.00000000,3317.15405795,1108.87277414],[0.00000000,0.00000000,1.00000000]]
     dist_coefficients =[0.0,0.0,0.0,0.0,0.0]
+    #dist_coefficients = [0.00548862,0.12807064,-0.01048389,-0.00508286,-0.27971602]
 
     np_camera_matrix = np.array(camera_matrix)
     np_dist_coefficients = np.array(dist_coefficients)
@@ -70,8 +75,8 @@ def detect_aruco_tags():
         corners = np.array(corners)
         # Draw detected markers on the frame
         #ids = ids.flatten
-        ids = ids.flatten()
         if ids is not None:
+            ids = ids.flatten()
             aruco.drawDetectedMarkers(frame, corners, ids=None, borderColor=(0, 255, 0))
             for (markerCorner, markerID) in zip(corners, ids):
             
