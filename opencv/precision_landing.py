@@ -246,7 +246,7 @@ def detect_aruco_tags():
 
                 if abs(x_ang) > INITIAL_ANGLE or abs(y_ang) > INITIAL_ANGLE:
                     vx = -0.1 if y_ang > LANDING_THRESHOLD_ANGLE else (0.1 if y_ang < -LANDING_THRESHOLD_ANGLE else 0)
-                    vy = 0. if x_ang > LANDING_THRESHOLD_ANGLE else (-0.1 if x_ang < -LANDING_THRESHOLD_ANGLE else 0)
+                    vy = 0.1 if x_ang > LANDING_THRESHOLD_ANGLE else (-0.1 if x_ang < -LANDING_THRESHOLD_ANGLE else 0)
 
                     print (vx, vy)
                     send_velocity(vx, vy, 0)
