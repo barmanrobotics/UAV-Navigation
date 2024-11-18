@@ -1,7 +1,7 @@
 # Owen Bartlett
 # Function to arm the motors
 
-import pymavlink as mavutil
+from pymavlink import mavutil
 import time
 
 connection = mavutil.mavlink_connection('udpin:localhost:14550')
