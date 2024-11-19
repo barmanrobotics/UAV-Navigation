@@ -4,7 +4,7 @@
 from pymavlink import mavutil
 import time
 
-connection = mavutil.mavlink_connection('/dev/ttyAMA0', baudrate = 921600)
+connection = mavutil.mavlink_connection('/dev/ttyAMA0', baud = 921600)
 
 # Wait for a heartbeat to confirm connection
 connection.wait_heartbeat()
