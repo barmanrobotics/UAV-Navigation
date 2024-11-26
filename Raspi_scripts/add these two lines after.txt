@@ -1,0 +1,25 @@
+add these two lines after making your virtual environment in the bashrc file
+
+pass this command to enter the bashrc
+
+nano ~/.bashrc
+
+Go to the end of the file and paste these two line replacing your virtual-environment name and file path.
+
+For my system, the virtual environment name was my-venv.
+
+alias my-venv="source /home/saintarnab/my-venv/bin/activate
+
+now if you type my-venv in a fresh terminal it should activate your virtual environment
+
+I also exported the path of mavproxy to the bashrc file to directly call it from my virtual environment rather than going inside the folder
+
+export PATH=$PATH:/home/saintarnab/my-venv/lib/python3.11/site-packages/MAVProxy
+
+now I can call mavproxy.py inside my virtual environment directly
+
+use command mavproxy.py --master=/dev/ttyAMA0 to connect to the copter at the default baudrate of 57600
+
+
+
+
