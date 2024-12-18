@@ -1,0 +1,17 @@
+Author: Arnab Chatterjee
+
+camera_matrix_1 = np.array([
+    [917.1777059, 0.00000000, 323.46713801],
+    [0.00000000, 926.27018107, 240.68578702],
+    [0.00000000, 0.00000000, 1.00000000]
+])
+
+dist_coefficients_1= np.array([
+    [-4.21053311e-01],
+    [6.10894559e+00],
+    [1.08524770e-03],
+    [-3.40935112e-02],
+    [-6.30249662e+01]
+])
+
+camera calibration values for camera module v3 at 640 x 480 pixels.
