@@ -94,6 +94,9 @@ PROTO x500 [
               Shape {
                 appearance Appearance {
                   material Material { diffuseColor 1 1 1 }
+                  texture ImageTexture {
+                    url [ "meshes/CF.png" ]
+                  }
                 }
                 geometry Mesh {
                   url [ "meshes/NXP-HGD-CF_reducedResolution.dae" ]
