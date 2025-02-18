@@ -14,8 +14,8 @@ WorldInfo {
   FPS 20
 }
 Viewpoint {
-  orientation -0.1131480903376038 -0.1529017053511846 0.981742623172516 4.527240776892014
-  position 7.235562674724572 -10.04723179280919 0.47833912542764134
+  orientation 0.16341660013299567 0.6268128152323336 -0.7618403438132488 0.724484243658283
+  position -2.1351683126817798 1.0021684823441328 1.4418358709919725
   follow "Iris"
   followSmoothness 0.01
 }
@@ -44,7 +44,7 @@ AdvertisingBoard {
   poleHeight 10
 }
 StraightRoadSegment {
-  translation -15 0.3 0.02
+  translation -15 0.3 0.01
   rotation 0 0 1 0.105
   width 16.5
   rightBorder FALSE
@@ -52,11 +52,24 @@ StraightRoadSegment {
   length 140
 }
 x500 {
-  translation 7.019375550243901 -11.178549821762365 0.22695094999999996
-  rotation -5.006711036795739e-16 -6.01706065619854e-17 1 0.20601742885829205
+  translation 1.5227600000002405e-05 -2.4556700000007818e-05 0.22695095000000004
+  rotation 0 0 0.9999999999999999 0
   controller "ardupilot_vehicle_controller"
   controllerArgs [
     "--motors"
     "m1_motor, m2_motor, m3_motor, m4_motor"
+    "--camera"
+    "camera"
+    "--camera-port"
+    "5599"
+  ]
+  extensionSlot [
+    Camera {
+      translation 0.15 0 1.63268e-07
+      rotation 0 1 0 1.5708
+      fieldOfView 1.15
+      width 640
+      height 480
+    }
   ]
 }
