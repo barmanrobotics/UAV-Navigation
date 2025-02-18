@@ -456,6 +456,7 @@ def detect_aruco_tags_2():
 
 # Example usage
 #detect_aruco_tags()
+<<<<<<< Updated upstream
 #connection_mode = get_flight_mode()
 #print(connection_mode)
 #time.sleep(3)
@@ -466,6 +467,13 @@ def detect_aruco_tags_2():
 #takeoff(6)
 #time.sleep(5)
 #set_flight_mode("LAND")
+=======
+connection_mode = get_flight_mode()
+set_flight_mode("GUIDED")
+arm_disarm_drone(1)
+takeoff(2)
+print(connection_mode)
+>>>>>>> Stashed changes
 detect_aruco_tags()
 #time.sleep(3)
 #picam2.stop()

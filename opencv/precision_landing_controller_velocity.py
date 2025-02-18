@@ -74,16 +74,16 @@ def set_flight_mode(mode):
         print(f"Waiting for mode change... (Current mode: {current_mode})")
         time.sleep(1)
 
-def send_velocity(ax, ay, vz):
+def send_velocity(vx, vy, vz):
     # Send velocity command in the drone's NED frame
     connection.mav.set_position_target_local_ned_send(
         0,       # time_boot_ms (not used)
         0, 0,    # target_system, target_component
         mavutil.mavlink.MAV_FRAME_BODY_NED,  # Frame of reference (Body frame)
-        0b110000000000,  # Control velocity only
+        0b110111000111,  # Control velocity only
         0, 0, 0,  # Position x, y, z (not used)
-        0, 0, vz,  # Velocity x, y, z
-        ax, ay, 0,  # Acceleration (not used)
+        vx, vy, vz,  # Velocity x, y, z
+        0, 0, 0,  # Acceleration (not used)
         0, 0  # yaw, yaw_rate (not used)
     )
     
@@ -136,7 +136,7 @@ def detect_aruco_tags():
 
     LANDING_THRESHOLD_ANGLE = 0.02 #radians
     INITIAL_ANGLE = 0.1
-    DESCENT_VELOCITY = 0.1 #m/s
+    DESCENT_VELOCITY = 0.3 #m/s
     INITIAL_ERROR = 0.01
     LANDING_THRESHOLD_ERROR = 0.01
     vel = 0.05
@@ -164,26 +164,8 @@ def detect_aruco_tags():
     
     i = 1
 
-    x_max = 0.576
-    y_max = 0.358
-
-    x_min = 0.017
-    y_min = 0.017
-
-    a_min = 0.1
-    a_max = 1
-
-    h_min = 40
-    h_max = 800
-
-    c1 = x_max/x_min
-    c2 = y_max/y_min
-
-    k1_x = a_max/x_max
-    k1_y = a_max/y_max
-
-    kp = 0.5
-    kd = 0.07
+    kp = 0.2
+    kd = 0.2
     ki = 0.0
 
     previous_time = time.time()
@@ -304,8 +286,8 @@ def detect_aruco_tags():
                 print(f"d_out_y: {d_out_y}")
                 print(f"p_out_y: {p_out_y}")
 
-                a_x = p_out_x + d_out_x + i_out_x
-                a_y = p_out_y + d_out_y + i_out_y
+                v_x = p_out_x + d_out_x + i_out_x
+                v_y = p_out_y + d_out_y + i_out_y
 
 
                 #ax = 0.01 + kp*(e_y) + kd*(e_y_t)
@@ -315,24 +297,24 @@ def detect_aruco_tags():
                 #y_ang_old = y_ang
 
                #Sprint(f"e_x: {x_ang}, e_x_t: {e_x_t}")
-                a_x= -a_x if abs(error_x) > INITIAL_ERROR else 0
-                a_y= a_y if abs(error_y) > INITIAL_ERROR else 0
+                v_x= -v_x if abs(error_x) > INITIAL_ERROR else 0
+                v_y= v_y if abs(error_y) > INITIAL_ERROR else 0
 
-                if a_x<-0.4:
-                    a_x=-0.4
-                if a_x>0.4:
-                    a_x=0.4
-                if a_y<-0.4:
-                    a_y=-0.4
-                if a_y>0.4:
-                    a_y=0.4
-                print (f"a_y: {a_y} a_x: {a_x}")
+                if v_x<-0.4:
+                    v_x=-0.4
+                if v_x>0.4:
+                    v_x=0.4
+                if v_y<-0.4:
+                    v_y=-0.4
+                if v_y>0.4:
+                    v_y=0.4
+                print (f"a_y: {v_y} a_x: {v_x}")
                 print("")
 
                 if ar_alt<200:
                     DESCENT_VELOCITY = 0.1
                 
-                send_velocity(a_x, a_y, DESCENT_VELOCITY)
+                send_velocity(v_x, v_y, DESCENT_VELOCITY)
 
                 
                 # draw the ArUco marker ID on the image
