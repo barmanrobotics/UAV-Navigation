@@ -89,17 +89,19 @@ PROTO x500 [
         children [
           Transform {
             translation 0 0 0.025
-            rotation 0 0 1 3.141592654
+            rotation 0 0 1 -1.570796327 
             children [
               Shape {
-                appearance Appearance {
-                  material Material { diffuseColor 1 1 1 }
-                  texture ImageTexture {
-                    url [ "meshes/CF.png" ]
-                  }
+                appearance PBRAppearance {
+                  baseColor 0.4 0.42 0.46
+                  #baseColorMap ImageTexture {
+                    #url [ "meshes/CF.png" ]
+                  #}
+                  metalness 0
+                  roughness 0.5
                 }
                 geometry Mesh {
-                  url [ "meshes/NXP-HGD-CF_reducedResolution.dae" ]
+                  url [ "meshes/X500_frame.obj" ]
                 }
               }
             ]
@@ -111,6 +113,7 @@ PROTO x500 [
         centerOfThrust 0.174 -0.174 0.06
         thrustConstants 0.0012 0
         torqueConstants 9.93e-3 0
+        fastHelixThreshold 110
         device RotationalMotor {
           name "m1_motor"
           maxVelocity 100
@@ -138,15 +141,17 @@ PROTO x500 [
           }
           children [
             Transform {
-              translation -0.022 -0.14638 -0.016
+              translation 0.022 0.1465 -0.01
               scale 0.84615 0.84615 0.84615
               children [
                 Shape {
-                  appearance DEF PROP_APPEARANCE Appearance {
-                    material Material { diffuseColor 0.2 0.2 0.2 }
+                  appearance DEF PROP_APPEARANCE PBRAppearance {
+                    baseColor 0.12 0.77 0.82
+                    roughness 1
+                    metalness 0
                   }
                   geometry DEF PROP_CCW_GEOMETRY Mesh {
-                    url [ "meshes/1345_prop_ccw_reducedResolution.stl" ]
+                    url [ "meshes/1345_prop_ccw.obj" ]
                   }
                 }
               ]
@@ -155,8 +160,10 @@ PROTO x500 [
               translation 0 0 -0.032
               children [
                 Shape {
-                  appearance DEF BELL_APPEARANCE Appearance {
-                    material Material { diffuseColor 0.5 0.5 0.5 }
+                  appearance DEF BELL_APPEARANCE PBRAppearance {
+                    baseColor 1 0.5 0.5
+                    roughness 1
+                    metalness 0
                   }
                   geometry DEF BELL_GEOMETRY Mesh {
                     url [ "meshes/5010Bell.dae" ]
@@ -172,6 +179,7 @@ PROTO x500 [
         centerOfThrust -0.174 0.174 0.06
         thrustConstants 0.0012 0
         torqueConstants 9.93e-3 0
+        fastHelixThreshold 110
         device RotationalMotor {
           name "m2_motor"
           maxVelocity 100
@@ -184,7 +192,7 @@ PROTO x500 [
           physics USE PROP_PHYSICS
           children [
             Transform {
-              translation -0.022 -0.14638 -0.016
+              translation 0.022 0.1465 -0.01
               scale 0.84615 0.84615 0.84615
               children [
                 Shape {
@@ -210,6 +218,7 @@ PROTO x500 [
         centerOfThrust 0.174 0.174 0.06
         thrustConstants -0.0012 0
         torqueConstants 9.93e-3 0
+        fastHelixThreshold 110
         device RotationalMotor {
           name "m3_motor"
           maxVelocity 100
@@ -222,13 +231,13 @@ PROTO x500 [
           physics USE PROP_PHYSICS
           children [
             Transform {
-              translation -0.022 -0.14638 -0.016
+              translation 0.022 0.1465 -0.01
               scale 0.84615 0.84615 0.84615
               children [
                 Shape {
                   appearance USE PROP_APPEARANCE
                   geometry DEF PROP_CW_GEOMETRY Mesh {
-                    url [ "meshes/1345_prop_cw_reducedResolution.stl" ]
+                    url [ "meshes/1345_prop_cw.obj" ]
                   }
                 }
               ]
@@ -250,6 +259,7 @@ PROTO x500 [
         centerOfThrust -0.174 -0.174 0.06
         thrustConstants -0.0012 0
         torqueConstants 9.93e-3 0
+        fastHelixThreshold 110
         device RotationalMotor {
           name "m4_motor"
           maxVelocity 100
@@ -262,7 +272,7 @@ PROTO x500 [
           physics USE PROP_PHYSICS
           children [
             Transform {
-              translation -0.022 -0.14638 -0.016
+              translation 0.022 0.1465 -0.01
               scale 0.84615 0.84615 0.84615
               children [
                 Shape {
