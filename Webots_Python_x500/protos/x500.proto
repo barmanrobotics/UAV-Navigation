@@ -79,7 +79,7 @@ PROTO x500 [
         }
         physics DEF BASE_LINK_PHYSICS Physics {
           density -1
-          mass 2.645
+          mass 1.645
           centerOfMass [ 0.000000 0.000000 0.000000 ]
           inertiaMatrix [
             0.0216667, 0.0216667, 0.04,  
@@ -112,11 +112,11 @@ PROTO x500 [
         shaftAxis 0 0 1
         centerOfThrust 0.174 -0.174 0.06
         thrustConstants 1.08e-03 0
-        torqueConstants 5.0e-04 0
+        torqueConstants 1.44e-07 0
         fastHelixThreshold 150
         device RotationalMotor {
           name "m1_motor"
-          maxVelocity 250
+          maxVelocity 118
           maxTorque 30
           multiplier 1
         }
@@ -178,11 +178,11 @@ PROTO x500 [
         shaftAxis 0 0 1
         centerOfThrust -0.174 0.174 0.06
         thrustConstants 1.08e-03 0
-        torqueConstants 5.0e-04 0
+        torqueConstants 1.44e-07 0
         fastHelixThreshold 150
         device RotationalMotor {
           name "m2_motor"
-          maxVelocity 250
+          maxVelocity 118
           maxTorque 30
           multiplier 1
         }
@@ -217,11 +217,11 @@ PROTO x500 [
         shaftAxis 0 0 1
         centerOfThrust 0.174 0.174 0.06
         thrustConstants -1.08e-03 0
-        torqueConstants 5.0e-04 0
+        torqueConstants 1.44e-07 0
         fastHelixThreshold 150
         device RotationalMotor {
           name "m3_motor"
-          maxVelocity 250
+          maxVelocity 118
           maxTorque 30
           multiplier -1
         }
@@ -258,11 +258,11 @@ PROTO x500 [
         shaftAxis 0 0 1
         centerOfThrust -0.174 -0.174 0.06
         thrustConstants -1.08e-03 0
-        torqueConstants 5.0e-04 0
+        torqueConstants 1.44e-07 0
         fastHelixThreshold 150
         device RotationalMotor {
           name "m4_motor"
-          maxVelocity 250
+          maxVelocity 118
           maxTorque 30
           multiplier -1
         }
