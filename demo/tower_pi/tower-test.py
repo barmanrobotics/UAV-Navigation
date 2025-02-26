@@ -1,5 +1,5 @@
 #Owen Bartlett
-# tower_pi.py
+# tower_test.py
 import socket
 import threading
 import math
@@ -14,8 +14,8 @@ gps_data = {}
 
 # Store connections with corresponding labels
 connections = {}
-label_counter = 1  # Start labeling from 1
-server_running = True  # Global control flag
+label_counter = 1  # Initialize label_counter globally
+server_running = True
 
 # Function to calculate the distance using the Haversine formula
 def haversine(coord1, coord2):
@@ -54,13 +54,7 @@ def handle_client(conn, label):
                         try:
                             lat, lon, alt = float(parts[1]), float(parts[2]), float(parts[3])
                             gps_data[label] = (lat, lon)
-                            # Calculate distance between drones if we have multiple drones
-                            if len(gps_data) > 1:
-                                drone_labels = list(gps_data.keys())
-                                d1, d2 = drone_labels[0], drone_labels[1]
-                                distance = haversine(gps_data[d1], gps_data[d2])
-                                if distance < 8:
-                                    connections[0].sendall("STANDBY".encode())
+                            # No need to send acknowledgment for GPS data
                         except ValueError:
                             print(f"Invalid GPS data from Drone {label}")
             except ConnectionResetError:
@@ -78,30 +72,22 @@ def handle_client(conn, label):
 def start_server():
     global label_counter, server_running
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        try:
-            s.bind((HOST, PORT))
-            s.listen()
-            print(f"Server listening on {HOST}:{PORT}")
-            
-            while server_running:
-                try:
-                    conn, addr = s.accept()
-                    label = str(label_counter)
-                    connections[label] = conn
-                    print(f"Drone {label} connected from {addr}")
-                    
-                    client_thread = threading.Thread(target=handle_client, args=(conn, label))
-                    client_thread.daemon = True
-                    client_thread.start()
-                    
-                    label_counter += 1
-                except Exception as e:
-                    print(f"Error accepting connection: {e}")
-                    if not server_running:
-                        break
-        except Exception as e:
-            print(f"Server error: {e}")
+        s.bind((HOST, PORT))
+        s.listen()
+        print("Hub Pi Server listening for connections...")
+
+        while server_running:
+            try:
+                conn, addr = s.accept()
+                label = str(label_counter)
+                label_counter += 1
+                connections[label] = conn
+                print(f"Drone {label} connected from {addr}")
+                client_thread = threading.Thread(target=handle_client, args=(conn, label))
+                client_thread.start()
+            except Exception as e:
+                print(f"Error accepting connection: {e}")
+                break  # Exit loop if socket is closed
 
 def send_command():
     global server_running
@@ -188,3 +174,4 @@ if __name__ == "__main__":
     server_thread = threading.Thread(target=start_server)
     server_thread.start()
     send_command()
+    
