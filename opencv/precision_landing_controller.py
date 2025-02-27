@@ -136,7 +136,7 @@ def detect_aruco_tags():
 
     LANDING_THRESHOLD_ANGLE = 0.02 #radians
     INITIAL_ANGLE = 0.1
-    DESCENT_VELOCITY = 0.1 #m/s
+    DESCENT_VELOCITY = 0.3 #m/s
     INITIAL_ERROR = 0.01
     LANDING_THRESHOLD_ERROR = 0.01
     vel = 0.05
@@ -155,10 +155,24 @@ def detect_aruco_tags():
     dist_coefficients =[0.0,0.0,0.0,0.0,0.0]
     #dist_coefficients = [0.00548862,0.12807064,-0.01048389,-0.00508286,-0.27971602]
 
+    camera_matrix_1 = np.array([
+    [917.1777059, 0.00000000, 323.46713801],
+    [0.00000000, 926.27018107, 240.68578702],
+    [0.00000000, 0.00000000, 1.00000000]
+    ])
+
+    dist_coefficients_1= np.array([
+    [-4.21053311e-01],
+    [6.10894559e+00],
+    [1.08524770e-03],
+    [-3.40935112e-02],
+    [-6.30249662e+01]
+    ])
+
     np_camera_matrix = np.array(camera_matrix)
     np_dist_coefficients = np.array(dist_coefficients)
 
-    marker_size = 20 #cm
+    marker_size = 18 #cm
 
     header_size = struct.calcsize("=HH")
     
