@@ -1,0 +1,177 @@
+# VRML_SIM R2022b utf8
+# xr 301 simplified model
+# motor/propeller constants were empirically determined.
+
+PROTO xr301 [
+  field  SFVec3f     translation     0 0 0
+  field  SFRotation  rotation        0 0 1 0
+  field  SFString    name            "xr301"  # Is `Robot.name`.
+  field  SFString    controller      "void"  # Is `Robot.controller`.
+  field  MFString    controllerArgs  []      # Is `Robot.controllerArgs`.
+  field  SFString    customData      ""      # Is `Robot.customData`.
+  field  SFBool      supervisor      FALSE   # Is `Robot.supervisor`.
+  field  SFBool      synchronization TRUE    # Is `Robot.synchronization`.
+  field  MFNode      extensionSlot   []      # Extends the robot with new nodes in the extension slot.
+]
+{
+  Robot {
+    translation IS translation
+    rotation IS rotation
+    controller IS controller
+    controllerArgs IS controllerArgs
+    customData IS customData
+    supervisor IS supervisor
+    synchronization IS synchronization
+    name IS name
+    children [
+      Group {
+        children IS extensionSlot
+      }
+      DEF XR301_MESH Shape {
+        appearance PBRAppearance {
+          baseColor 1 1 1
+          baseColorMap ImageTexture {
+                    url "textures/texture.png"
+          }
+          roughness 0.2
+          metalness 0.1
+        }
+        geometry Mesh {
+          url "meshes/frame.obj"
+        }
+        castShadows TRUE
+      }
+      
+      DEF CAMERA_MESH Shape {
+        appearance PBRAppearance {
+          baseColor 0.235 0.51 0.561
+          roughness 0.5
+          metalness 0.4
+        }
+        geometry Mesh {
+          url "meshes/camera.obj"
+        }
+        castShadows TRUE
+      }
+      
+      Propeller {
+        shaftAxis 0 0 1
+        centerOfThrust 0.18056 -0.18056 0.075
+        thrustConstants 0.0012 0
+        torqueConstants 5.0e-04 0
+        device RotationalMotor {
+          name "m1_motor"
+          maxVelocity 100
+          maxTorque 30
+          multiplier 1
+        }
+        slowHelix Solid {
+          translation 0.18056 -0.18056 0.075
+          children [
+            Shape {
+              appearance DEF PROP_BLUE PBRAppearance {
+                baseColor 0.153 0.165 0.271
+                metalness 0.3
+              }
+              geometry DEF CCW_PROP Mesh {
+                url [
+                  "meshes/prop_ccw.obj"
+                ]
+              }
+            }
+          ]
+        }
+      }
+      Propeller {
+        shaftAxis 0 0 1
+        centerOfThrust -0.18056 0.18056 0.075
+        thrustConstants 0.0012 0
+        torqueConstants 5.0e-04 0
+        device RotationalMotor {
+          name "m2_motor"
+          maxVelocity 100
+          maxTorque 30
+          multiplier 1
+        }
+        slowHelix Solid {
+          translation -0.18056 0.18056 0.075
+          children [
+            Shape {
+              appearance DEF PROP_ORANGE PBRAppearance {
+                baseColor 1 0.761 0.153
+                metalness 0.3
+              }
+              geometry USE CCW_PROP
+            }
+          ]
+        }
+      }
+      Propeller {
+        shaftAxis 0 0 1
+        centerOfThrust 0.18056 0.18056 0.075
+        thrustConstants -0.0012 0
+        torqueConstants 5.0e-04 0
+        device RotationalMotor {
+          name "m3_motor"
+          maxVelocity 100
+          maxTorque 30
+          multiplier -1
+        }
+        slowHelix Solid {
+          translation 0.18056 0.18056 0.075
+          children [
+            Shape {
+              appearance USE PROP_BLUE
+              geometry DEF CW_PROP Mesh {
+                url [
+                  "meshes/prop_cw.obj"
+                ]
+              }
+            }
+          ]
+        }
+      }
+      Propeller {
+        shaftAxis 0 0 1
+        centerOfThrust -0.18056 -0.18056 0.075
+        thrustConstants -0.0012 0
+        torqueConstants 5.0e-04 0
+        device RotationalMotor {
+          name "m4_motor"
+          maxVelocity 100
+          maxTorque 30
+          multiplier -1
+        }
+        slowHelix Solid {
+          translation -0.18056 -0.18056 0.075
+          children [
+            Shape {
+              appearance USE PROP_ORANGE
+              geometry USE CW_PROP
+            }
+          ]
+        }
+      }
+      Accelerometer {
+      }
+      GPS {
+      }
+      Gyro {
+      }
+      InertialUnit {
+      }
+    ]
+    boundingObject Mesh{
+          url "meshes/bounding_object.obj"
+    }
+    physics Physics {
+      density -1
+      mass 2.00
+      centerOfMass [ 0.000000 0.000000 0.025 ]
+      inertiaMatrix [
+            0.02843, 0.02401 0.03268,  
+            0.0, 0.0, 0.0
+      ]
+    }
+  }
+}
