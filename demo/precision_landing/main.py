@@ -11,6 +11,7 @@ parser.add_argument("--descend_velocity", type=float, default=0.3, help="Set des
 parser.add_argument("--kp", type=float, default=0.5, help="Proportional gain for PID control")
 parser.add_argument("--kd", type=float, default=0.07, help="Derivative gain for PID control")
 parser.add_argument("--ki", type=float, default=0.0, help="Integral gain for PID control")
+parser.add_argument("--connection", type=float, default=14541, help="Drone IP")
 args = parser.parse_args()
 
 USE_PI_CAMERA = args.use_pi_camera  # Set to False for simulation
@@ -19,7 +20,7 @@ kp, kd, ki = args.kp, args.kd, args.ki
 previous_time = time.time()
 
 # Connect to the drone
-connection = connect_drone()
+connection = connect_drone(args.connection)
 set_flight_mode(connection, "GUIDED")
 arm_disarm_drone(connection, 1)
 takeoff(connection, 4)
