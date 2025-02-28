@@ -1,8 +1,8 @@
 from pymavlink import mavutil
 import time
 
-def connect_drone():
-    connection = mavutil.mavlink_connection('udpin:localhost:14541')
+def connect_drone(port):
+    connection = mavutil.mavlink_connection(f'udpin:localhost:{port}')
     connection.wait_heartbeat()
     print("Connected to the vehicle")
     return connection
