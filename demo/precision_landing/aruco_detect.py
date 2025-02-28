@@ -16,7 +16,7 @@ def connect_camera(use_pi_camera=True):
         from picamera2 import Picamera2
         from libcamera import controls
         picam2 = Picamera2()
-        picam2.configure(picam2.create_preview_configuration(main={"format": 'RGB888', "size": (x_res, y_res)}))
+        picam2.configure(picam2.create_preview_configuration(raw={"size": (1536, 864)},main={"format": 'RGB888', "size": (x_res, y_res)}))
         picam2.start()
         picam2.set_controls({"AfMode": controls.AfModeEnum.Continuous})
         x_res, y_res = 640, 480
