@@ -21,7 +21,7 @@ def way_point(connection, x_offset, y_offset, z_offset):
             connection.target_component,
             mavutil.mavlink.MAV_FRAME_LOCAL_NED,
             int(0b110111111000),
-            target_x, target_y, target_z,
+            target_x, target_y, -target_z,
             0, 0, 0,  # velocity
             0, 0, 0,  # acceleration
             0, 0      # yaw, yaw_rate
