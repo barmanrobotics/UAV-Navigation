@@ -22,6 +22,11 @@ PORT = int(sys.argv[1])  # Get the port from the command line argument
 def execute_command(command):
     if command == "TAKEOFF":
         print("Executing TAKEOFF")
+        connection.mav.set_mode_send(
+    	    connection.target_system,
+    	    mavutil.mavlink.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED,
+    	    4  # GUIDED mode for ArduPilot
+    	)
         connection.mav.command_long_send(
             connection.target_system,
             connection.target_component,
