@@ -60,18 +60,14 @@ def execute_command(command):
         rth(connection)
     elif command == "STANDBY":
         print("Entering STANDBY (Hover in place)")
-        msg = connection.recv_match(type='LOCAL_POSITION_NED', blocking=True)
-        hover_x = msg.x
-        hover_y = msg.y
-        hover_z = msg.z
         
         connection.mav.set_position_target_local_ned_send(
             0,
             connection.target_system,
             connection.target_component,
-            mavutil.mavlink.MAV_FRAME_LOCAL_NED,
+            mavutil.mavlink.MAV_FRAME_LOCAL_OFFSET_NED,
             int(0b110111111000),
-            hover_x, hover_y, hover_z,
+            0, 0, 0,
             0, 0, 0,
             0, 0, 0,
             0, 0
@@ -129,8 +125,10 @@ def main():
         # Send periodic messages
         while True:
             try:
+                print(client)
                 client.send("Drone status: OK".encode())
-                time.sleep(5)
+                send_gps_coordinates(client)
+                time.sleep(3)
             except:
                 break
                 
