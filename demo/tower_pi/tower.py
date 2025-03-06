@@ -54,13 +54,19 @@ def handle_client(conn, label):
                         try:
                             lat, lon, alt = float(parts[1]), float(parts[2]), float(parts[3])
                             gps_data[label] = (lat, lon)
-                            # Calculate distance between drones if we have multiple drones
+                            fixed_coord = (39.2904, -76.6122)  # Arbitrary fixed GPS coordinates
+                            
+                            if label in gps_data:
+                                distance = haversine(gps_data[label], fixed_coord)
+                                print(f"Distance from Drone {label} to fixed point: {distance:.2f} meters")
+                            
                             if len(gps_data) > 1:
                                 drone_labels = list(gps_data.keys())
                                 d1, d2 = drone_labels[0], drone_labels[1]
                                 distance = haversine(gps_data[d1], gps_data[d2])
+                                print(f"Distance between Drone {d1} and Drone {d2}: {distance:.2f} meters")
                                 if distance < 8:
-                                    connections[0].sendall("STANDBY".encode())
+                                    connections[d1].sendall("AVOID".encode())
                         except ValueError:
                             print(f"Invalid GPS data from Drone {label}")
             except ConnectionResetError:
