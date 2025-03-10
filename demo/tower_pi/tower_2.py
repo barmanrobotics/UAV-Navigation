@@ -3,9 +3,10 @@ import threading
 import math
 import os
 import time
+from pymavlink import mavutil
 
 HOST = '0.0.0.0'  # Listen on all available network interfaces
-PORTS = [14550, 14551]
+PORTS = [14550, 14560]
 
 gps_data = {}
 connections = {}
@@ -27,14 +28,13 @@ def haversine(coord1, coord2):
 def handle_client(conn, label):
     try:
         print(f"Connection established with Drone {label}")
-        collision = False
         while True:
             try:
                 message = conn.recv(1024).decode()
                 if not message:
                     print(f"Connection closed by Drone {label}")
                     break
-                # print(f"Drone {label}: {message}")
+                print(f"Drone {label}: {message}")
 
                 # Only respond to GPS data, don't echo other messages
                 if message.startswith("GPS"):
@@ -42,23 +42,27 @@ def handle_client(conn, label):
                     if len(parts) == 4:
                         try:
                             lat, lon, alt = float(parts[1]), float(parts[2]), float(parts[3])
-                            gps_data[label] = (lat, lon)
+                            gps_data[label] = (lat, lon, alt)
                             fixed_coord = (-35.3632621, 149.165193)  # Arbitrary fixed GPS coordinates
-                            
+
                             if label in gps_data:
-                                distance = haversine(gps_data[label], fixed_coord)
+                                distance = haversine(gps_data[label][0:2], fixed_coord)
                                 # print(f"Distance from Drone {label} to fixed point: {distance:.2f} meters")
                             
                             if len(gps_data) > 1:
                                 drone_labels = list(gps_data.keys())
                                 d1, d2 = drone_labels[0], drone_labels[1]
-                                distance = haversine(gps_data[d1], gps_data[d2])
+                                distance = haversine(gps_data[d1][0:2], gps_data[d2][0:2])
+                                alt_diff = abs(gps_data[d1][2] - gps_data[d2][2])
+                                print(f"Altitude difference: {alt_diff}")
                                 print(f"Distance between Drone {d1} and Drone {d2}: {distance:.2f} meters")
-                                if distance < 8 and collision==False:
+                                if distance < 8 and alt_diff < 4.5:
+                                    # conn.mav.send()
                                     connections[d1].sendall("AVOID".encode())
                                     
-                        except ValueError:
+                        except ValueError as e:
                             print(f"Invalid GPS data from Drone {label}")
+                            print(e)
             except ConnectionResetError:
                 print(f"Connection reset by Drone {label}")
                 break
