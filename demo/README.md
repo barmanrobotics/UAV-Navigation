@@ -1,4 +1,4 @@
-Last updated: 
+Last updated: 3/10/25
 1. Run webots sim
 2. Add `--instance 0` and `--instance 1` arguments to xr301 protos in webots
 3. Run following commands in order (and in seperate terminal windows)
