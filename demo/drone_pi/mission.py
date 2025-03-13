@@ -4,10 +4,6 @@ import time
 import threading
 import sys
 
-# MAVLink Connection to PX4
-connection = mavutil.mavlink_connection('udpin:localhost:14550')
-connection.wait_heartbeat()
-
 # Client Configuration
 HUB_IP = 'localhost'
 if len(sys.argv) < 2:
@@ -15,6 +11,10 @@ if len(sys.argv) < 2:
     sys.exit(1)
 
 PORT = int(sys.argv[1])
+
+# MAVLink Connection to PX4
+connection = mavutil.mavlink_connection(f'udpin:localhost:{PORT}')
+connection.wait_heartbeat()
 
 current_command = None  # Track ongoing command
 
@@ -28,28 +28,31 @@ def send_gps_coordinates(client):
                 alt = msg.alt / 1e3
                 gps_data = f"GPS {lat} {lon} {alt}"
                 client.sendall(gps_data.encode())
-            time.sleep(5)  # Add delay to prevent flooding
+            # time.sleep(0.5)  # Add delay to prevent flooding
         except Exception as e:
             print(f"Error sending GPS data: {e}")
             break
 
 def execute_command(command):
     global current_command
-    
-    if command == "AVOID":
-        print("Executing AVOID - Gaining Altitude")
-        paused_command = current_command  # Store the current command
-        
-        from avoid import avoid_obstacle  # Import function from avoid.py
-        avoid_obstacle(connection)  # Increase altitude
-        
-        if paused_command:
-            print(f"Resuming previous command: {paused_command}")
-            execute_command(paused_command)
-        return  # Exit after handling AVOID
 
-    current_command = command  # Update current command
+    if command==None:
+        return
     
+    # if command == "AVOID":
+        # print("Executing AVOID - Gaining Altitude")
+        # paused_command = current_command  # Store the current command
+        
+        # from avoid import avoid_obstacle  # Import function from avoid.py
+        # avoid_obstacle(connection)  # Increase altitude
+        
+        # if paused_command:
+        #     print(f"Resuming previous command: {paused_command}")
+        #     execute_command(paused_command)
+        # return  # Exit after handling AVOID
+
+    # current_command = command  # Update current command
+
     if command == "TAKEOFF":
         print("Executing TAKEOFF")
         connection.mav.set_mode_send(
@@ -79,7 +82,21 @@ def execute_command(command):
         try:
             x_offset, y_offset, z_offset = map(float, params[1:])
             from way_point import way_point
-            way_point(connection, x_offset, y_offset, z_offset)
+            
+            msg = connection.recv_match(type='LOCAL_POSITION_NED', blocking=True)
+
+            current_x = msg.x
+            current_y = msg.y
+            current_z = msg.z
+            
+            target_x = current_x + x_offset
+            target_y = current_y + y_offset
+            target_z = current_z - z_offset
+
+            current_command = f"WAYPOINT {target_x} {target_y} {target_z}"
+            print("CUR COMMAND UPDATED", current_command)
+            way_point(connection, target_x, target_y, target_z)
+
         except Exception as e:
             print(f"Error executing waypoint navigation: {e}")
     elif command == "RTH":
@@ -103,6 +120,28 @@ def execute_command(command):
         print("Executing Precision Landing via external script")
         from precision_landing import precision_landing
         precision_landing(connection)
+
+    elif command == "AVOID":
+        print("AVOIDNG")
+        from avoid import avoid_obstacle
+        avoid_obstacle(connection)
+
+    elif command == "STOP":
+        connection.mav.command_long_send(
+            connection.target_system, connection.target_component,
+            mavutil.mavlink.MAV_CMD_DO_SET_MODE,
+            0,
+            1,
+            17, # Mode 17 (brake)
+            0, 0, 0, 0, 0
+        )
+        time.sleep(5)
+        print("STOPPED")
+    
+    elif command == "RESUME":
+        print("TESTING", current_command)
+        print(type(current_command))
+        execute_command(current_command)
 
 # Function to handle incoming messages
 def receive_messages(client_socket):
