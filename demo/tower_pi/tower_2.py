@@ -3,7 +3,6 @@ import threading
 import math
 import os
 import time
-from pymavlink import mavutil
 
 HOST = '0.0.0.0'  # Listen on all available network interfaces
 PORTS = [14550, 14560]
@@ -12,6 +11,8 @@ gps_data = {}
 connections = {}
 label_counter = 1  # Start labeling from 1
 server_running = True
+avoidance_enabled = 0
+last_command = {}
 
 def haversine(coord1, coord2):
     R = 6371000  # Radius of Earth in meters
@@ -26,6 +27,7 @@ def haversine(coord1, coord2):
     return R * c
 
 def handle_client(conn, label):
+    global avoidance_enabled
     try:
         print(f"Connection established with Drone {label}")
         while True:
@@ -34,7 +36,7 @@ def handle_client(conn, label):
                 if not message:
                     print(f"Connection closed by Drone {label}")
                     break
-                print(f"Drone {label}: {message}")
+                # print(f"Drone {label}: {message}")
 
                 # Only respond to GPS data, don't echo other messages
                 if message.startswith("GPS"):
@@ -54,11 +56,26 @@ def handle_client(conn, label):
                                 d1, d2 = drone_labels[0], drone_labels[1]
                                 distance = haversine(gps_data[d1][0:2], gps_data[d2][0:2])
                                 alt_diff = abs(gps_data[d1][2] - gps_data[d2][2])
-                                print(f"Altitude difference: {alt_diff}")
-                                print(f"Distance between Drone {d1} and Drone {d2}: {distance:.2f} meters")
-                                if distance < 8 and alt_diff < 4.5:
-                                    # conn.mav.send()
-                                    connections[d1].sendall("AVOID".encode())
+                                # print(f"Altitude difference: {alt_diff}")
+                                # print(f"Distance between Drone {d1} and Drone {d2}: {distance:.2f} meters")
+                                if distance < 15 and alt_diff < 2:
+                                    if avoidance_enabled==0:
+                                        print("avoidance_enabled_0")
+                                        connections[d1].sendall("STOP".encode())
+                                        connections[d2].sendall("STOP".encode())
+                                        avoidance_enabled = 1
+                                    elif avoidance_enabled==1:
+                                        print("avoidance_enabled_1")
+                                        connections[d2].sendall("AVOID".encode())
+                                        avoidance_enabled = 2
+                                elif (distance > 15 or alt_diff > 2) and avoidance_enabled==2:
+                                    print("avoidance_enabled_2")
+                                    print("LAST COMMAND ", last_command)
+                                    # connections[d1].sendall(last_command[d1].encode())
+                                    # connections[d2].sendall(last_command[d2].encode())
+                                    connections[d1].send("RESUME".encode())
+                                    connections[d2].send("RESUME".encode())
+                                    avoidance_enabled = 0
                                     
                         except ValueError as e:
                             print(f"Invalid GPS data from Drone {label}")
@@ -134,7 +151,7 @@ def send_command():
             command = ' '.join(input_split[1:])
             
             # Validate command type
-            if command not in ["TAKEOFF", "RTH", "STANDBY"] and not command.startswith("WAYPOINT"):
+            if command not in ["TAKEOFF", "RTH", "STANDBY", "RESUME"] and not command.startswith("WAYPOINT"):
                 print("Invalid command.")
                 print("Available commands: TAKEOFF, WAYPOINT <x> <y> <z>, RTH, STANDBY")
                 continue
@@ -155,6 +172,7 @@ def send_command():
             # Send command to drone
             if target_label in connections:
                 try:
+                    last_command[target_label] = command
                     connections[target_label].sendall(command.encode())
                     response = connections[target_label].recv(1024).decode()
                     print(f"Response from Drone {target_label}: {response}")
