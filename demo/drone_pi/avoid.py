@@ -10,8 +10,10 @@ def avoid_obstacle(connection):
         print("Failed to retrieve altitude data")
         return
 
+    delta_alt = 10
+
     current_alt = msg.alt / 1000  # Convert from mm to meters
-    target_alt = current_alt + 5  # Increase altitude by 5 meters
+    target_alt = current_alt + delta_alt  # Increase altitude by 5 meters
 
     print(f"Current Altitude: {current_alt}m, Target Altitude: {target_alt}m")
 
@@ -33,13 +35,22 @@ def avoid_obstacle(connection):
     #     0   # Yaw rate (unchanged)
     # )
 
+    connection.mav.command_long_send(
+        connection.target_system, connection.target_component,
+        mavutil.mavlink.MAV_CMD_DO_SET_MODE,
+        0,
+        1,
+        4, # Switch to mode 4 (guided)
+        0, 0, 0, 0, 0
+    )
+
     connection.mav.set_position_target_local_ned_send(
         0,
         connection.target_system,
         connection.target_component,
         mavutil.mavlink.MAV_FRAME_LOCAL_OFFSET_NED,
         0b110111111000,
-        0, 0, -5, # Gain 5m altitude
+        0, 0, -delta_alt, # Gain altitude
         0, 0, 0,
         0, 0, 0,
         0, 0
@@ -48,7 +59,7 @@ def avoid_obstacle(connection):
     # Wait until the altitude has increased
     while True:
         msg = connection.recv_match(type='GLOBAL_POSITION_INT', blocking=True)
-        if msg and (msg.alt / 1000) >= target_alt - 0.5:  # Allow small tolerance
+        if msg and (msg.alt / 1000) >= target_alt - 0.5: # Allow small tolerance
             print(f"Altitude reached: {msg.alt / 1000}m, moving forward")
             break
         time.sleep(1)
