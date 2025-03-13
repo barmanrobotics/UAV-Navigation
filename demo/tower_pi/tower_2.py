@@ -12,7 +12,7 @@ connections = {}
 label_counter = 1  # Start labeling from 1
 server_running = True
 avoidance_enabled = 0
-last_command = {}
+avoidance_started = None
 
 def haversine(coord1, coord2):
     R = 6371000  # Radius of Earth in meters
@@ -27,7 +27,7 @@ def haversine(coord1, coord2):
     return R * c
 
 def handle_client(conn, label):
-    global avoidance_enabled
+    global avoidance_enabled, avoidance_started
     try:
         print(f"Connection established with Drone {label}")
         while True:
@@ -70,11 +70,12 @@ def handle_client(conn, label):
                                         avoidance_enabled = 2
                                 elif (distance > 15 or alt_diff > 2) and avoidance_enabled==2:
                                     print("avoidance_enabled_2")
-                                    print("LAST COMMAND ", last_command)
-                                    # connections[d1].sendall(last_command[d1].encode())
-                                    # connections[d2].sendall(last_command[d2].encode())
                                     connections[d1].send("RESUME".encode())
                                     connections[d2].send("RESUME".encode())
+                                    avoidance_started = time.time()
+                                    avoidance_enabled = 3
+                                elif avoidance_enabled == 3 and (time.time()-avoidance_started)>12:
+                                    print("Avoidance detection resumed.")
                                     avoidance_enabled = 0
                                     
                         except ValueError as e:
@@ -187,7 +188,6 @@ def send_command():
             # Send command to drone
             if target_label in connections:
                 try:
-                    last_command[target_label] = command
                     connections[target_label].sendall(command.encode())
                     response = connections[target_label].recv(1024).decode()
                     print(f"Response from Drone {target_label}: {response}")
