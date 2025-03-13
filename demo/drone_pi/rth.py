@@ -16,9 +16,9 @@ def rth(connection):
     msg = None
     while msg is None:
         msg = connection.recv_match(type='HOME_POSITION', blocking=True)
-    home_lat = msg.latitude / 1e7
-    home_lon = msg.longitude / 1e7
-    home_alt = msg.altitude / 1000.0  # Convert from mm to meters
+        home_lat = msg.latitude / 1e7
+        home_lon = msg.longitude / 1e7
+        home_alt = msg.altitude / 1000.0  # Convert from mm to meters
 
     print(f"Home Coordinates: Lat={home_lat}, Lon={home_lon}, Alt={home_alt}")
 

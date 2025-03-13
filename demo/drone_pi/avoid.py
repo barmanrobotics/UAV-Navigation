@@ -17,23 +17,6 @@ def avoid_obstacle(connection):
 
     print(f"Current Altitude: {current_alt}m, Target Altitude: {target_alt}m")
 
-    # Set position target for altitude increase and forward movement
-    # connection.mav.set_position_target_global_int_send(
-    #     0,  # Time_boot_ms (ignored)
-    #     connection.target_system,
-    #     connection.target_component,
-    #     mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT,
-    #     int(0b110111111000),  # Bitmask: Ignore velocity and acceleration, use position
-    #     0,  # Latitude (0 = unchanged)
-    #     0,  # Longitude (0 = unchanged)
-    #     target_alt,  # New altitude
-    #     0,  # Move forward at 2 m/s
-    #     0,  # No sideways movement
-    #     0,  # No vertical velocity change
-    #     0, 0, 0,  # No acceleration settings
-    #     0,  # Yaw (unchanged)
-    #     0   # Yaw rate (unchanged)
-    # )
 
     connection.mav.command_long_send(
         connection.target_system, connection.target_component,

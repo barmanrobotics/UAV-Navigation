@@ -1,6 +1,6 @@
-import cv2
-import cv2.aruco as aruco
-import numpy as np
+import cv2 # type: ignore
+import cv2.aruco as aruco # type: ignore
+import numpy as np # type: ignore
 import struct
 import socket
 import math
@@ -8,18 +8,18 @@ import math
 camera_matrix = None
 dist_coefficients = None
 marker_size = 10
+x_res, y_res = 640, 480
 
 def connect_camera(use_pi_camera=True):
     global camera_matrix, dist_coefficients
     """Connects to either the Pi Camera or the simulation camera."""
     if use_pi_camera:
-        from picamera2 import Picamera2
-        from libcamera import controls
+        from picamera2 import Picamera2 # type: ignore
+        from libcamera import controls # type: ignore
         picam2 = Picamera2()
-        picam2.configure(picam2.create_preview_configuration(main={"format": 'RGB888', "size": (x_res, y_res)}))
+        picam2.configure(picam2.create_preview_configuration(raw={"size": (1536, 864)},main={"format": 'RGB888', "size": (x_res, y_res)}))
         picam2.start()
         picam2.set_controls({"AfMode": controls.AfModeEnum.Continuous})
-        x_res, y_res = 640, 480
         camera_matrix = np.array([
             [917.1777059, 0.0, 323.46713801],
             [0.0, 926.27018107, 240.68578702],
@@ -35,8 +35,6 @@ def connect_camera(use_pi_camera=True):
         vertical_fov = 41*(math.pi/180) #vertical_fov in radians for normal raspi camera module 3
         # x_res= 1536 # pixels
         #y_res = 864 # pixels
-        x_res = 640
-        y_res = 480
         s_x = 6.45  # mm
         s_y = 3.63  # mm
         focal_length = 4.74 # mm

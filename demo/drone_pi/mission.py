@@ -16,8 +16,8 @@ PORT = int(sys.argv[1])
 connection = mavutil.mavlink_connection(f'udpin:localhost:{PORT}')
 connection.wait_heartbeat()
 
-current_command = None  # Track ongoing command
-
+# Track ongoing waypoint
+current_waypoint = None
 def send_gps_coordinates(client):
     while True:
         try:
@@ -34,24 +34,11 @@ def send_gps_coordinates(client):
             break
 
 def execute_command(command):
-    global current_command
+    global current_waypoint
 
     if command==None:
         return
     
-    # if command == "AVOID":
-        # print("Executing AVOID - Gaining Altitude")
-        # paused_command = current_command  # Store the current command
-        
-        # from avoid import avoid_obstacle  # Import function from avoid.py
-        # avoid_obstacle(connection)  # Increase altitude
-        
-        # if paused_command:
-        #     print(f"Resuming previous command: {paused_command}")
-        #     execute_command(paused_command)
-        # return  # Exit after handling AVOID
-
-    # current_command = command  # Update current command
 
     if command == "TAKEOFF":
         print("Executing TAKEOFF")
@@ -93,8 +80,8 @@ def execute_command(command):
             target_y = current_y + y_offset
             target_z = current_z - z_offset
 
-            current_command = f"WAYPOINT {target_x} {target_y} {target_z}"
-            print("CUR COMMAND UPDATED", current_command)
+            current_waypoint = f"WAYPOINT {target_x} {target_y} {target_z}"
+            print("CUR COMMAND UPDATED", current_waypoint)
             way_point(connection, target_x, target_y, target_z)
 
         except Exception as e:
@@ -116,9 +103,9 @@ def execute_command(command):
             0, 0, 0,
             0, 0
         )
-    elif command == "PRECISION_LAND":
+    elif command == "LAND":
         print("Executing Precision Landing via external script")
-        from precision_landing import precision_landing
+        from precision_landing.land import precision_landing
         precision_landing(connection)
 
     elif command == "AVOID":
@@ -139,9 +126,9 @@ def execute_command(command):
         print("STOPPED")
     
     elif command == "RESUME":
-        print("TESTING", current_command)
-        print(type(current_command))
-        execute_command(current_command)
+        print("TESTING", current_waypoint)
+        print(type(current_waypoint))
+        execute_command(current_waypoint)
 
 # Function to handle incoming messages
 def receive_messages(client_socket):

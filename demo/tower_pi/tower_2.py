@@ -151,9 +151,9 @@ def send_command():
             command = ' '.join(input_split[1:])
             
             # Validate command type
-            if command not in ["TAKEOFF", "RTH", "STANDBY", "RESUME"] and not command.startswith("WAYPOINT"):
+            if command not in ["TAKEOFF", "RTH", "STANDBY", "RESUME", "LAND"] and not command.startswith("WAYPOINT"):
                 print("Invalid command.")
-                print("Available commands: TAKEOFF, WAYPOINT <x> <y> <z>, RTH, STANDBY")
+                print("Available commands: TAKEOFF, WAYPOINT <x> <y> <z>, RTH, STANDBY, LAND")
                 continue
             
             # Special handling for WAYPOINT command
@@ -168,6 +168,21 @@ def send_command():
                 except ValueError:
                     print("Invalid WAYPOINT coordinates. Must be numbers.")
                     continue
+            if command == "LAND":
+                print("Opening landing sequence")
+                print("Opening Flaps")
+                from open_flaps import extendStepperUntilLimit
+                extendStepperUntilLimit()
+                time.sleep(1)
+                if target_label in connections:
+                    last_command[target_label] = command
+                    connections[target_label].sendall(command.encode())
+                    response = connections[target_label].recv(1024).decode()
+                    print(f"Response from Drone {target_label}: {response}")
+                else:
+                    print(f"No connection with Drone {target_label}")
+                    print(f"Available drones: {list(connections.keys())}")
+                    
             
             # Send command to drone
             if target_label in connections:
