@@ -16,8 +16,8 @@ PORT = int(sys.argv[1])
 connection = mavutil.mavlink_connection(f'udpin:localhost:{PORT}')
 connection.wait_heartbeat()
 
-# Track ongoing waypoint
-current_waypoint = None
+current_command = None  # Track ongoing command
+
 def send_gps_coordinates(client):
     while True:
         try:
@@ -34,14 +34,18 @@ def send_gps_coordinates(client):
             break
 
 def execute_command(command):
-    global current_waypoint
+    global current_command
 
     if command==None:
         return
-    
 
     if command == "TAKEOFF":
         print("Executing TAKEOFF")
+        msg = connection.recv_match(type='LOCAL_POSITION_NED', blocking=True)
+        current_command = f"ABSOLUTE_WAYPOINT {msg.x} {msg.y} {msg.z-10}"
+
+        print("TAKEOFF EST POS ", current_command)
+        
         connection.mav.set_mode_send(
             connection.target_system,
             mavutil.mavlink.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED,
@@ -60,6 +64,19 @@ def execute_command(command):
             mavutil.mavlink.MAV_CMD_NAV_TAKEOFF,
             0, 0, 0, 0, 0, 0, 0, 10
         )
+
+    elif command.startswith("ABSOLUTE_WAYPOINT"):
+        try:
+            params = command.split()
+            target_x, target_y, target_z = map(float, params[1:])
+            from way_point import way_point
+            
+            print("CUR ABS COMMAND UPDATED", current_command)
+            way_point(connection, target_x, target_y, target_z)
+
+        except Exception as e:
+            print(f"Error executing waypoint navigation: {e}")
+
     elif command.startswith("WAYPOINT"):
         print("Executing WAYPOINT NAVIGATION")
         params = command.split()
@@ -80,16 +97,16 @@ def execute_command(command):
             target_y = current_y + y_offset
             target_z = current_z - z_offset
 
-            current_waypoint = f"WAYPOINT {target_x} {target_y} {target_z}"
-            print("CUR COMMAND UPDATED", current_waypoint)
+            current_command = f"ABSOLUTE_WAYPOINT {target_x} {target_y} {target_z}"
+            print("CUR COMMAND UPDATED", current_command)
             way_point(connection, target_x, target_y, target_z)
 
         except Exception as e:
             print(f"Error executing waypoint navigation: {e}")
     elif command == "RTH":
         print("Executing RTH (Return to Home)")
-        from rth import rth
-        rth(connection)
+        current_command = "ABSOLUTE_WAYPOINT 0 0 -10"
+        execute_command("ABSOLUTE_WAYPOINT 0 0 -10")
     elif command == "STANDBY":
         print("Entering STANDBY (Hover in place)")
         connection.mav.set_position_target_local_ned_send(
@@ -103,15 +120,17 @@ def execute_command(command):
             0, 0, 0,
             0, 0
         )
-    elif command == "LAND":
+    elif command == "PRECISION_LAND":
         print("Executing Precision Landing via external script")
-        from precision_landing.land import precision_landing
+        from precision_landing import precision_landing
         precision_landing(connection)
 
     elif command == "AVOID":
         print("AVOIDNG")
         from avoid import avoid_obstacle
         avoid_obstacle(connection)
+
+        time.sleep(12)
 
     elif command == "STOP":
         connection.mav.command_long_send(
@@ -122,13 +141,25 @@ def execute_command(command):
             17, # Mode 17 (brake)
             0, 0, 0, 0, 0
         )
-        time.sleep(5)
+
         print("STOPPED")
+        time.sleep(10)
+
+        connection.mav.command_long_send(
+            connection.target_system, connection.target_component,
+            mavutil.mavlink.MAV_CMD_DO_SET_MODE,
+            0,
+            1,
+            4, # Switch to mode 4 (guided)
+            0, 0, 0, 0, 0
+        )
+
+        time.sleep(1)
     
     elif command == "RESUME":
-        print("TESTING", current_waypoint)
-        print(type(current_waypoint))
-        execute_command(current_waypoint)
+        print("TESTING", current_command)
+        print(type(current_command))
+        execute_command(current_command)
 
 # Function to handle incoming messages
 def receive_messages(client_socket):
