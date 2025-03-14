@@ -11,8 +11,8 @@ gps_data = {}
 connections = {}
 label_counter = 1  # Start labeling from 1
 server_running = True
-avoidance_enabled = 0
-avoidance_started = None
+avoidance_enabled = 2
+stage_started = time.time()
 
 def haversine(coord1, coord2):
     R = 6371000  # Radius of Earth in meters
@@ -27,7 +27,7 @@ def haversine(coord1, coord2):
     return R * c
 
 def handle_client(conn, label):
-    global avoidance_enabled, avoidance_started
+    global avoidance_enabled, stage_started
     try:
         print(f"Connection established with Drone {label}")
         while True:
@@ -58,23 +58,28 @@ def handle_client(conn, label):
                                 alt_diff = abs(gps_data[d1][2] - gps_data[d2][2])
                                 # print(f"Altitude difference: {alt_diff}")
                                 # print(f"Distance between Drone {d1} and Drone {d2}: {distance:.2f} meters")
-                                if distance < 15 and alt_diff < 2:
+                                
+                                collision_perimeter = 10
+                                
+                                if distance < collision_perimeter and alt_diff < 2:
                                     if avoidance_enabled==0:
                                         print("avoidance_enabled_0")
                                         connections[d1].sendall("STOP".encode())
                                         connections[d2].sendall("STOP".encode())
                                         avoidance_enabled = 1
-                                    elif avoidance_enabled==1:
+                                        stage_started = time.time()
+                                    elif avoidance_enabled==1 and (time.time() - stage_started)>=10:
                                         print("avoidance_enabled_1")
                                         connections[d2].sendall("AVOID".encode())
                                         avoidance_enabled = 2
-                                elif (distance > 15 or alt_diff > 2) and avoidance_enabled==2:
+                                        stage_started = time.time()
+                                elif (distance > collision_perimeter or alt_diff > 2) and avoidance_enabled==2 and (time.time() - stage_started)>=12:
                                     print("avoidance_enabled_2")
                                     connections[d1].send("RESUME".encode())
                                     connections[d2].send("RESUME".encode())
-                                    avoidance_started = time.time()
                                     avoidance_enabled = 3
-                                elif avoidance_enabled == 3 and (time.time()-avoidance_started)>12:
+                                    stage_started = time.time()
+                                elif (distance > collision_perimeter or alt_diff > 2) and avoidance_enabled == 3 and (time.time()-stage_started)>=15:
                                     print("Avoidance detection resumed.")
                                     avoidance_enabled = 0
                                     
@@ -152,13 +157,13 @@ def send_command():
             command = ' '.join(input_split[1:])
             
             # Validate command type
-            if command not in ["TAKEOFF", "RTH", "STANDBY", "RESUME"] and not command.startswith("WAYPOINT"):
+            if command not in ["TAKEOFF", "RTH", "STANDBY", "RESUME"] and not command.startswith("WAYPOINT") and not command.startswith("ABSOLUTE_WAYPOINT"):
                 print("Invalid command.")
                 print("Available commands: TAKEOFF, WAYPOINT <x> <y> <z>, RTH, STANDBY")
                 continue
             
             # Special handling for WAYPOINT command
-            if command.startswith("WAYPOINT"):
+            if command.startswith("WAYPOINT") or command.startswith("ABSOLUTE_WAYPOINT"):
                 parts = command.split()
                 if len(parts) != 4:
                     print("Invalid WAYPOINT format. Use: WAYPOINT <x> <y> <z>")
