@@ -59,9 +59,10 @@ def handle_client(conn, label):
                                 # print(f"Altitude difference: {alt_diff}")
                                 # print(f"Distance between Drone {d1} and Drone {d2}: {distance:.2f} meters")
                                 
-                                collision_perimeter = 10
+                                collision_radius = 7
+                                alt_radius = 2
                                 
-                                if distance < collision_perimeter and alt_diff < 2:
+                                if (distance < collision_radius) and (alt_diff < alt_radius):
                                     if avoidance_enabled==0:
                                         print("avoidance_enabled_0")
                                         connections[d1].sendall("STOP".encode())
@@ -73,13 +74,13 @@ def handle_client(conn, label):
                                         connections[d2].sendall("AVOID".encode())
                                         avoidance_enabled = 2
                                         stage_started = time.time()
-                                elif (distance > collision_perimeter or alt_diff > 2) and avoidance_enabled==2 and (time.time() - stage_started)>=12:
+                                elif (distance > collision_radius or alt_diff > alt_radius) and avoidance_enabled==2 and (time.time() - stage_started)>=12:
                                     print("avoidance_enabled_2")
                                     connections[d1].send("RESUME".encode())
                                     connections[d2].send("RESUME".encode())
                                     avoidance_enabled = 3
                                     stage_started = time.time()
-                                elif (distance > collision_perimeter or alt_diff > 2) and avoidance_enabled == 3 and (time.time()-stage_started)>=15:
+                                elif (distance > collision_radius or alt_diff > alt_radius) and avoidance_enabled == 3 and (time.time()-stage_started)>=15:
                                     print("Avoidance detection resumed.")
                                     avoidance_enabled = 0
                                     
