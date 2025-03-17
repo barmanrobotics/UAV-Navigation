@@ -10,23 +10,13 @@ def avoid_obstacle(connection):
         print("Failed to retrieve altitude data")
         return
 
-    delta_alt = 10
+    delta_alt = 5
 
     current_alt = msg.alt / 1000  # Convert from mm to meters
     target_alt = current_alt + delta_alt  # Increase altitude by 5 meters
 
     print(f"Current Altitude: {current_alt}m, Target Altitude: {target_alt}m")
-
-
-    connection.mav.command_long_send(
-        connection.target_system, connection.target_component,
-        mavutil.mavlink.MAV_CMD_DO_SET_MODE,
-        0,
-        1,
-        4, # Switch to mode 4 (guided)
-        0, 0, 0, 0, 0
-    )
-
+    
     connection.mav.set_position_target_local_ned_send(
         0,
         connection.target_system,
