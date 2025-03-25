@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drone Management Dashboard</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="dashboard">
+        <header>
+            <h1>Drone Management System</h1>
+        </header>
+        
+        <div class="main-content">
+            <div id="map" style="height: 500px;"></div>
+            
+            <div class="control-panel">
+                <h2>Drone Status</h2>
+                <div id="drone-list"></div>
+                
+                <h2>Command Center</h2>
+                <div class="command-form">
+                    <select id="drone-select">
+                        <option value="">Select Drone</option>
+                    </select>
+                    
+                    <select id="command-select">
+                        <option value="">Select Command</option>
+                        <option value="TAKEOFF">Takeoff</option>
+                        <option value="WAYPOINT">Waypoint</option>
+                        <option value="RTH">Return to Home</option>
+                        <option value="STANDBY">Standby</option>
+                        <option value="LAND">Land</option>
+                    </select>
+                    
+                    <div id="takeoff-inputs" style="display: none;">
+                        <input type="number" id="takeoff-alt" placeholder="Takeoff Altitude (meters)">
+                    </div>
+                    
+                    <div id="waypoint-inputs" style="display: none;">
+                        <input type="number" id="wp-x" placeholder="X Offset">
+                        <input type="number" id="wp-y" placeholder="Y Offset">
+                        <input type="number" id="wp-z" placeholder="Z Offset">
+                    </div>
+                    
+                    <button id="send-command">Send Command</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html> 

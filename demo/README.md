@@ -13,8 +13,8 @@ Running the simulation:
 
 `python3 tower_2.py`
 
-`python3 mission_2.py 14550`
+`python3 mission.py 14550`
 
-`python3 mission_2.py 14560`
+`python3 mission.py 14560`
 
 Last updated: 3/16/25
