@@ -82,7 +82,6 @@ def handle_client(conn, label):
                 if not message:
                     print(f"Connection closed by Drone {label}")
                     break
-                # print(f"Drone {label}: {message}")
 
                 # Only respond to GPS data, don't echo other messages
                 if message.startswith("GPS"):
@@ -92,37 +91,30 @@ def handle_client(conn, label):
                             lat, lon, alt = float(parts[1]), float(parts[2]), float(parts[3])
                             gps_data[label] = (lat, lon, alt)
                             send_gps_to_server(label, lat, lon, alt)
-                            fixed_coord = (-35.3632621, 149.165193)  # Arbitrary fixed GPS coordinates
-
-                            if label in gps_data:
-                                distance = haversine(gps_data[label][0:2], fixed_coord)
-                                # print(f"Distance from Drone {label} to fixed point: {distance:.2f} meters")
                             
                             if len(gps_data) > 1:
                                 drone_labels = list(gps_data.keys())
                                 d1, d2 = drone_labels[0], drone_labels[1]
                                 distance = haversine(gps_data[d1][0:2], gps_data[d2][0:2])
                                 alt_diff = abs(gps_data[d1][2] - gps_data[d2][2])
-                                # print(f"Altitude difference: {alt_diff}")
-                                # print(f"Distance between Drone {d1} and Drone {d2}: {distance:.2f} meters")
                                 
                                 horizontal_radius = 7
                                 vertical_radius = 2
                                 
                                 if (distance < horizontal_radius) and (alt_diff < vertical_radius):
                                     if avoidance_enabled==0:
-                                        print("avoidance_enabled_0")
+                                        print("ALERT: Collision risk detected. Stopping drones.")
                                         connections[d1].sendall("STOP".encode())
                                         connections[d2].sendall("STOP".encode())
                                         avoidance_enabled = 1
                                         stage_started = time.time()
                                     elif avoidance_enabled==1 and (time.time() - stage_started)>=10:
-                                        print("avoidance_enabled_1")
+                                        print("ALERT: Initiating avoidance maneuver.")
                                         connections[d2].sendall("AVOID".encode())
                                         avoidance_enabled = 2
                                         stage_started = time.time()
                                 elif (distance > horizontal_radius or alt_diff > vertical_radius) and avoidance_enabled==2 and (time.time() - stage_started)>=12:
-                                    print("avoidance_enabled_2")
+                                    print("ALERT: Collision risk resolved. Resuming flight.")
                                     connections[d1].send("RESUME".encode())
                                     connections[d2].send("RESUME".encode())
                                     avoidance_enabled = 3
@@ -133,7 +125,6 @@ def handle_client(conn, label):
                                     
                         except ValueError as e:
                             print(f"Invalid GPS data from Drone {label}")
-                            print(e)
             except ConnectionResetError:
                 print(f"Connection reset by Drone {label}")
                 break
@@ -198,30 +189,10 @@ def send_command():
             # Validate command format
             if len(input_split) < 2:
                 print("Invalid input. Format: <label> <command> <params>")
-                print("Available commands: TAKEOFF, WAYPOINT <x> <y> <z>, RTH, STANDBY")
                 continue
             
             target_label = input_split[0]
             command = ' '.join(input_split[1:])
-            
-            # Validate command type
-            if command not in ["TAKEOFF", "RTH", "STANDBY", "RESUME"] and not command.startswith("WAYPOINT") and not command.startswith("ABSOLUTE_WAYPOINT"):
-                print("Invalid command.")
-                print("Available commands: TAKEOFF, WAYPOINT <x> <y> <z>, RTH, STANDBY")
-                continue
-            
-            # Special handling for WAYPOINT command
-            if command.startswith("WAYPOINT") or command.startswith("ABSOLUTE_WAYPOINT"):
-                parts = command.split()
-                if len(parts) != 4:
-                    print("Invalid WAYPOINT format. Use: WAYPOINT <x> <y> <z>")
-                    continue
-                try:
-                    # Verify that coordinates are numbers
-                    float(parts[1]), float(parts[2]), float(parts[3])
-                except ValueError:
-                    print("Invalid WAYPOINT coordinates. Must be numbers.")
-                    continue
             
             # Send command to drone
             if target_label in connections:
@@ -249,7 +220,6 @@ def send_command():
             os._exit(0)
         except Exception as e:
             print(f"Error processing command: {e}")
-            print("Please try again.")
             continue
 
 if __name__ == "__main__":
@@ -258,4 +228,5 @@ if __name__ == "__main__":
     for port in PORTS:
         server_thread = threading.Thread(target=start_server, args=(port,))
         server_thread.start()
+    print("Tower control server started. Type 'END' to exit.")
     send_command()
