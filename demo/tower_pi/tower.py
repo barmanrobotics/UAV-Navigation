@@ -1,42 +1,79 @@
-#Owen Bartlett
-# tower_pi.py
 import socket
 import threading
 import math
 import os
+import time
+import json
 
-# Tower Pi Server Configuration
 HOST = '0.0.0.0'  # Listen on all available network interfaces
-PORT = 8000      # Port number for the server
+PORTS = [14550, 14560]
+SERVER_PORT = 6542
+COMM_PORT = 6553
 
-# Store GPS coordinates for each drone
 gps_data = {}
-
-# Store connections with corresponding labels
 connections = {}
 label_counter = 1  # Start labeling from 1
-server_running = True  # Global control flag
+server_running = True
+avoidance_enabled = 2
+stage_started = time.time()
 
-# Function to calculate the distance using the Haversine formula
 def haversine(coord1, coord2):
     R = 6371000  # Radius of Earth in meters
     lat1, lon1 = coord1
     lat2, lon2 = coord2
-    
     phi1 = math.radians(lat1)
     phi2 = math.radians(lat2)
     delta_phi = math.radians(lat2 - lat1)
     delta_lambda = math.radians(lon2 - lon1)
-    
-    a = (math.sin(delta_phi / 2) ** 2 + 
-         math.cos(phi1) * math.cos(phi2) * 
-         math.sin(delta_lambda / 2) ** 2)
+    a = (math.sin(delta_phi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2) ** 2)
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    
-    return R * c  # Distance in meters
+    return R * c
+
+def send_gps_to_server(label, lat, lon, alt):
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect((HOST, COMM_PORT))
+            gps_message = json.dumps({
+                "drone_id": label,
+                "lat": lat,
+                "lon": lon,
+                "alt": alt
+            })
+            s.sendall(gps_message.encode())
+    except Exception as e:
+        print(f"Error sending gps data to server: {e}")
+
+def receive_server_commands():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
+        server_socket.bind((HOST, SERVER_PORT))
+        server_socket.listen()
+        print("Listening for server commands")
+
+        while True:
+            conn, addr = server_socket.accept()
+            with conn:
+                command = conn.recv(1024).decode()
+                if not command:
+                    continue
+
+                print(f"Received command from server: {command}")
+                parts = command.split(maxsplit=1)
+                if len(parts) < 2:
+                    print("Invalid command format")
+                    continue
+
+                target_label, command_data = parts
+                if target_label in connections:
+                    try:
+                        connections[target_label].sendall(command_data.encode())
+                    except Exception as e:
+                        print(f"Error sending command to Drone {target_label}: {e}")
+                else:
+                    print(f"No connection with Drone {target_label}")
+
 
 def handle_client(conn, label):
-    """Handle communication with drone {label}"""
+    global avoidance_enabled, stage_started
     try:
         print(f"Connection established with Drone {label}")
         while True:
@@ -45,7 +82,7 @@ def handle_client(conn, label):
                 if not message:
                     print(f"Connection closed by Drone {label}")
                     break
-                print(f"Drone {label}: {message}")
+                # print(f"Drone {label}: {message}")
 
                 # Only respond to GPS data, don't echo other messages
                 if message.startswith("GPS"):
@@ -53,22 +90,50 @@ def handle_client(conn, label):
                     if len(parts) == 4:
                         try:
                             lat, lon, alt = float(parts[1]), float(parts[2]), float(parts[3])
-                            gps_data[label] = (lat, lon)
-                            fixed_coord = (39.2904, -76.6122)  # Arbitrary fixed GPS coordinates
-                            
+                            gps_data[label] = (lat, lon, alt)
+                            send_gps_to_server(label, lat, lon, alt)
+                            fixed_coord = (-35.3632621, 149.165193)  # Arbitrary fixed GPS coordinates
+
                             if label in gps_data:
-                                distance = haversine(gps_data[label], fixed_coord)
-                                print(f"Distance from Drone {label} to fixed point: {distance:.2f} meters")
+                                distance = haversine(gps_data[label][0:2], fixed_coord)
+                                # print(f"Distance from Drone {label} to fixed point: {distance:.2f} meters")
                             
                             if len(gps_data) > 1:
                                 drone_labels = list(gps_data.keys())
                                 d1, d2 = drone_labels[0], drone_labels[1]
-                                distance = haversine(gps_data[d1], gps_data[d2])
-                                print(f"Distance between Drone {d1} and Drone {d2}: {distance:.2f} meters")
-                                if distance < 8:
-                                    connections[d1].sendall("AVOID".encode())
-                        except ValueError:
+                                distance = haversine(gps_data[d1][0:2], gps_data[d2][0:2])
+                                alt_diff = abs(gps_data[d1][2] - gps_data[d2][2])
+                                # print(f"Altitude difference: {alt_diff}")
+                                # print(f"Distance between Drone {d1} and Drone {d2}: {distance:.2f} meters")
+                                
+                                horizontal_radius = 7
+                                vertical_radius = 2
+                                
+                                if (distance < horizontal_radius) and (alt_diff < vertical_radius):
+                                    if avoidance_enabled==0:
+                                        print("avoidance_enabled_0")
+                                        connections[d1].sendall("STOP".encode())
+                                        connections[d2].sendall("STOP".encode())
+                                        avoidance_enabled = 1
+                                        stage_started = time.time()
+                                    elif avoidance_enabled==1 and (time.time() - stage_started)>=10:
+                                        print("avoidance_enabled_1")
+                                        connections[d2].sendall("AVOID".encode())
+                                        avoidance_enabled = 2
+                                        stage_started = time.time()
+                                elif (distance > horizontal_radius or alt_diff > vertical_radius) and avoidance_enabled==2 and (time.time() - stage_started)>=12:
+                                    print("avoidance_enabled_2")
+                                    connections[d1].send("RESUME".encode())
+                                    connections[d2].send("RESUME".encode())
+                                    avoidance_enabled = 3
+                                    stage_started = time.time()
+                                elif (distance > horizontal_radius or alt_diff > vertical_radius) and avoidance_enabled == 3 and (time.time()-stage_started)>=15:
+                                    print("Avoidance detection resumed.")
+                                    avoidance_enabled = 0
+                                    
+                        except ValueError as e:
                             print(f"Invalid GPS data from Drone {label}")
+                            print(e)
             except ConnectionResetError:
                 print(f"Connection reset by Drone {label}")
                 break
@@ -81,33 +146,30 @@ def handle_client(conn, label):
         conn.close()
         print(f"Cleaned up connection for Drone {label}")
 
-def start_server():
+def start_server(port):
     global label_counter, server_running
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
-            s.bind((HOST, PORT))
+            s.bind((HOST, port))
             s.listen()
-            print(f"Server listening on {HOST}:{PORT}")
-            
+            print(f"Server listening on {HOST}:{port}")
             while server_running:
                 try:
                     conn, addr = s.accept()
                     label = str(label_counter)
                     connections[label] = conn
-                    print(f"Drone {label} connected from {addr}")
-                    
+                    print(f"Drone {label} connected from {addr} on port {port}")
                     client_thread = threading.Thread(target=handle_client, args=(conn, label))
                     client_thread.daemon = True
                     client_thread.start()
-                    
                     label_counter += 1
                 except Exception as e:
-                    print(f"Error accepting connection: {e}")
+                    print(f"Error accepting connection on port {port}: {e}")
                     if not server_running:
                         break
         except Exception as e:
-            print(f"Server error: {e}")
+            print(f"Server error on port {port}: {e}")
 
 def send_command():
     global server_running
@@ -143,13 +205,13 @@ def send_command():
             command = ' '.join(input_split[1:])
             
             # Validate command type
-            if command not in ["TAKEOFF", "RTH", "STANDBY"] and not command.startswith("WAYPOINT"):
+            if command not in ["TAKEOFF", "RTH", "STANDBY", "RESUME"] and not command.startswith("WAYPOINT") and not command.startswith("ABSOLUTE_WAYPOINT"):
                 print("Invalid command.")
                 print("Available commands: TAKEOFF, WAYPOINT <x> <y> <z>, RTH, STANDBY")
                 continue
             
             # Special handling for WAYPOINT command
-            if command.startswith("WAYPOINT"):
+            if command.startswith("WAYPOINT") or command.startswith("ABSOLUTE_WAYPOINT"):
                 parts = command.split()
                 if len(parts) != 4:
                     print("Invalid WAYPOINT format. Use: WAYPOINT <x> <y> <z>")
@@ -191,6 +253,9 @@ def send_command():
             continue
 
 if __name__ == "__main__":
-    server_thread = threading.Thread(target=start_server)
-    server_thread.start()
+    command_thread = threading.Thread(target=receive_server_commands, daemon=True)
+    command_thread.start()
+    for port in PORTS:
+        server_thread = threading.Thread(target=start_server, args=(port,))
+        server_thread.start()
     send_command()

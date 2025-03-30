@@ -4,10 +4,7 @@ from flask_cors import CORS
 import threading
 import time
 import json
-
-# Import or access tower data
-# This could be done by modifying tower_2.py to expose its data
-# or by creating a data sharing mechanism
+import socket
 
 app = Flask(__name__)
 CORS(app)
@@ -36,6 +33,47 @@ tower_data = {
     }
 }
 
+TOWER_IP = "0.0.0.0"
+TOWER_PORT = 6553
+TOWER_COMMAND_PORT = 6542
+
+def receive_gps_data():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
+        server_socket.bind((TOWER_IP, TOWER_PORT))
+        server_socket.listen()
+        print(f"Listening for GPS data from tower on port {TOWER_PORT}...")
+
+        while True:
+            conn, addr = server_socket.accept()
+            with conn:
+                data = conn.recv(1024).decode()
+                if not data:
+                    continue
+
+                try:
+                    gps_update = json.loads(data)
+                    drone_id = gps_update["drone_id"]
+                    lat, lon, alt = gps_update["lat"], gps_update["lon"], gps_update["alt"]
+
+                    drone_data[drone_id] = {
+                        "lat": lat,
+                        "lon": lon,
+                        "alt": alt,
+                        "status": drone_data.get(drone_id, {}).get("status", "STANDBY")
+                    }
+
+                except json.JSONDecodeError:
+                    print("Invalid GPS data format received")
+
+def send_command_to_tower(drone_id, command):
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect((TOWER_IP, TOWER_COMMAND_PORT))
+            command_message = f"{drone_id} {command}"
+            s.sendall(command_message.encode())
+    except Exception as e:
+        print(f"Error sending command to tower: {e}")
+        
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -62,44 +100,8 @@ def handle_command(data):
     command = data['command']
     print(f"Received command for Drone {drone_id}: {command}")
     
-    # Process commands with parameters appropriately
-    # For example, extract altitude from TAKEOFF command or coordinates from WAYPOINT
-    command_parts = command.split()
-    command_type = command_parts[0]
-    
-    # In a real implementation, you would send this command to the actual drone
-    # For this MVP, we'll just update the status
-    
-    # Update the drone status in our mock data
     if drone_id in drone_data:
-        drone_data[drone_id]["status"] = command
-        
-        # If it's a TAKEOFF command, we could simulate altitude change
-        if command_type == "TAKEOFF" and len(command_parts) > 1:
-            try:
-                target_alt = float(command_parts[1])
-                # For demonstration, set the drone's altitude to the target
-                drone_data[drone_id]["alt"] = target_alt
-            except ValueError:
-                pass
-                
-        # If it's a WAYPOINT command, we could simulate position change
-        elif command_type == "WAYPOINT" and len(command_parts) >= 4:
-            try:
-                x_offset = float(command_parts[1])
-                y_offset = float(command_parts[2])
-                z_offset = float(command_parts[3])
-                
-                # For demonstration, adjust the position slightly
-                # In a real implementation, you would calculate actual GPS coordinates
-                drone_data[drone_id]["lat"] += x_offset * 0.00001
-                drone_data[drone_id]["lon"] += y_offset * 0.00001
-                drone_data[drone_id]["alt"] += z_offset
-            except ValueError:
-                pass
-                
-        # Broadcast the updated data to all clients
-        socketio.emit('data_update', {"drones": drone_data, "towers": tower_data})
+        send_command_to_tower(drone_id, command)
 
 def background_update():
     """Simulate real-time updates from the tower system"""
@@ -109,10 +111,14 @@ def background_update():
         time.sleep(1)
 
 if __name__ == '__main__':
+    print("HELLO")
     # Start the background thread for updates
     update_thread = threading.Thread(target=background_update)
     update_thread.daemon = True
     update_thread.start()
+
+    gps_thread = threading.Thread(target=receive_gps_data, daemon=True)
+    gps_thread.start()
     
     # Start the web server with debug mode off
-    socketio.run(app, host='0.0.0.0', port=5000, debug=False) 
+    socketio.run(app, host='0.0.0.0', port=5000, debug=False)

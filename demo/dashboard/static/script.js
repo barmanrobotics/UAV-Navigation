@@ -174,10 +174,10 @@ document.getElementById('send-command').addEventListener('click', function() {
     } else if (commandType === 'TAKEOFF') {
         const alt = document.getElementById('takeoff-alt').value;
         
-        if (!alt) {
-            alert('Please provide takeoff altitude');
-            return;
-        }
+        // if (!alt) {
+        //     alert('Please provide takeoff altitude');
+        //     return;
+        // }
         
         command = `TAKEOFF ${alt}`;
     }

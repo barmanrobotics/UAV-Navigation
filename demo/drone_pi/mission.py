@@ -38,9 +38,23 @@ def execute_command(command):
 
     if command==None:
         return
+    
+    print("MADE IT HERE")
+    print(command)
 
-    if command == "TAKEOFF":
+    if command.startswith("TAKEOFF"):
+        params = command.split()
+        print(params)
         print("Executing TAKEOFF")
+        if len(params)==1:
+            alt = 10
+        elif len(params)>2:
+            print("Invalid takeoff command")
+            return
+        else:
+            alt = float(params[1])
+        print(type(alt))
+
         msg = connection.recv_match(type='LOCAL_POSITION_NED', blocking=True)
         current_command = f"ABSOLUTE_WAYPOINT {msg.x} {msg.y} {msg.z-10}"
 
@@ -62,7 +76,7 @@ def execute_command(command):
             connection.target_system,
             connection.target_component,
             mavutil.mavlink.MAV_CMD_NAV_TAKEOFF,
-            0, 0, 0, 0, 0, 0, 0, 10
+            0, 0, 0, 0, 0, 0, 0, alt
         )
 
     elif command.startswith("ABSOLUTE_WAYPOINT"):
