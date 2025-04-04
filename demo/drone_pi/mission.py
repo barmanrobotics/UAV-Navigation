@@ -10,11 +10,10 @@ if len(sys.argv) < 2:
     print("Usage: python3 node_pi_client.py <PORT>")
     sys.exit(1)
 
-PORT = int(sys.argv[1])
+PORT = 14551
 
 # MAVLink Connection to PX4
-connection = mavutil.mavlink_connection(f'udpin:localhost:{PORT}')
-connection.wait_heartbeat()
+connection = mavutil.mavlink_connection('udpin:localhost:14551')
 
 current_command = None  # Track ongoing command
 

@@ -125,4 +125,4 @@ if __name__ == '__main__':
     
     print("Dashboard available at http://127.0.0.1:5000")
     # Start the web server with debug mode off
-    socketio.run(app, host='0.0.0.0', port=5000, debug=False)
+    socketio.run(app, host='0.0.0.0', port=5000, debug=False, allow_unsafe_werkzeug=True)
