@@ -10,12 +10,15 @@ if len(sys.argv) < 2:
     print("Usage: python3 node_pi_client.py <PORT>")
     sys.exit(1)
 
-PORT = 14551
+PORT = int(sys.argv[1])
 
 # MAVLink Connection to PX4
-connection = mavutil.mavlink_connection('udpin:localhost:14551')
+connection = mavutil.mavlink_connection(f'udpin:localhost:{PORT}')
+connection.wait_heartbeat()
 
 current_command = None  # Track ongoing command
+
+home_gps = {"lat": 0, "lon": 0, "alt": 0}
 
 def send_gps_coordinates(client):
     while True:
@@ -37,13 +40,16 @@ def execute_command(command):
 
     if command==None:
         return
-    
-    print("MADE IT HERE")
-    print(command)
 
     if command.startswith("TAKEOFF"):
+        while True:
+            msg = connection.recv_match(type='GLOBAL_POSITION_INT', blocking=True)
+            if msg:
+                break
+        home_gps["lat"] = msg.lat / 1e7
+        home_gps["lon"] = msg.lon / 1e7
+        home_gps["alt"] = msg.alt / 1e3
         params = command.split()
-        print(params)
         print("Executing TAKEOFF")
         if len(params)==1:
             alt = 10
@@ -52,12 +58,11 @@ def execute_command(command):
             return
         else:
             alt = float(params[1])
-        print(type(alt))
 
         msg = connection.recv_match(type='LOCAL_POSITION_NED', blocking=True)
         current_command = f"ABSOLUTE_WAYPOINT {msg.x} {msg.y} {msg.z-10}"
 
-        print("TAKEOFF EST POS ", current_command)
+        # print("TAKEOFF EST POS ", current_command)
         
         connection.mav.set_mode_send(
             connection.target_system,
@@ -84,7 +89,7 @@ def execute_command(command):
             target_x, target_y, target_z = map(float, params[1:])
             from way_point import way_point
             
-            print("CUR ABS COMMAND UPDATED", current_command)
+            # print("CUR ABS COMMAND UPDATED", current_command)
             way_point(connection, target_x, target_y, target_z)
 
         except Exception as e:
@@ -116,10 +121,38 @@ def execute_command(command):
 
         except Exception as e:
             print(f"Error executing waypoint navigation: {e}")
-    elif command == "RTH":
-        print("Executing RTH (Return to Home)")
-        current_command = "ABSOLUTE_WAYPOINT 0 0 -10"
-        execute_command("ABSOLUTE_WAYPOINT 0 0 -10")
+
+    elif command == "RTH":        
+        connection.mav.set_mode_send(
+            connection.target_system,
+            mavutil.mavlink.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED,
+            4
+        )
+        time.sleep(1)
+
+        home_lat = int(home_gps["lat"] * 1e7)
+        home_lon = int(home_gps["lon"] * 1e7)
+        hover_altitude = 10
+        target_alt = int(hover_altitude)
+
+        print(f"Home GPS: {home_gps}, Target alt: {target_alt}")
+
+        connection.mav.set_position_target_global_int_send(
+            0,
+            connection.target_system,
+            connection.target_component,
+            mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT_INT,
+            0b0000111111111000,
+            home_lat,
+            home_lon,
+            target_alt,
+            0, 0, 0,
+            0, 0, 0,
+            0, 0
+        )
+
+        current_command = "RTH"
+
     elif command == "STANDBY":
         print("Entering STANDBY (Hover in place)")
         connection.mav.set_position_target_local_ned_send(
@@ -135,8 +168,19 @@ def execute_command(command):
         )
     elif command == "PRECISION_LAND":
         print("Executing Precision Landing via external script")
-        from precision_landing import precision_landing
-        precision_landing(connection)
+        from precision_landing import land
+        land.precision_landing(connection)
+
+    elif command == "LAND":
+        print("Landing...")
+        connection.mav.command_long_send(
+            connection.target_system,
+            connection.target_component,
+            mavutil.mavlink.MAV_CMD_NAV_LAND,
+            0, 0, 0,
+            0, 0, 0,
+            0, 0
+        )
 
     elif command == "AVOID":
         print("AVOIDNG")
@@ -170,8 +214,6 @@ def execute_command(command):
         time.sleep(1)
     
     elif command == "RESUME":
-        print("TESTING", current_command)
-        print(type(current_command))
         execute_command(current_command)
 
 # Function to handle incoming messages
