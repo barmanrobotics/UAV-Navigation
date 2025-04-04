@@ -37,12 +37,12 @@ function updateMap(data) {
             droneMarkers[id].setLatLng(position);
         } else {
             const droneIcon = L.divIcon({
-                html: `<div class="drone-icon">🚁</div>`,
+                html: `<div class="drone-icon" style="font-size: 30px;">🚁</div>`,
                 className: 'drone-marker',
                 iconSize: [30, 30],
-                iconAnchor: [15, 15],  // Center the icon
-                popupAnchor: [0, -15],  // Position popup above the icon
-                className: 'drone-marker-fixed'  // New class for fixed-size icons
+                iconAnchor: [15, 15],
+                popupAnchor: [0, -15],
+                className: 'drone-marker-fixed' 
             });
             
             droneMarkers[id] = L.marker(position, {icon: droneIcon})
@@ -62,7 +62,7 @@ function updateMap(data) {
             towerMarkers[id].setLatLng(position);
         } else {
             const towerIcon = L.divIcon({
-                html: `<div class="tower-icon">🗼</div>`,
+                html: `<div class="tower-icon" style="font-size: 30px;">🗼</div>`,
                 className: 'tower-marker',
                 iconSize: [30, 30],
                 iconAnchor: [15, 15],  // Center the icon
@@ -194,4 +194,4 @@ document.getElementById('send-command').addEventListener('click', function() {
         drone_id: droneId,
         command: command
     });
-}); 
+});
