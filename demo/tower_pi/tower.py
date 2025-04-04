@@ -110,7 +110,7 @@ def handle_client(conn, label):
                                 horizontal_radius = 7
                                 vertical_radius = 2
 
-                                print("disable_avoidance_detection", disable_avoidance_detection)
+                                # print("disable_avoidance_detection", disable_avoidance_detection)
                                 if disable_avoidance_detection:
                                     continue
 
