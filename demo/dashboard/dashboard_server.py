@@ -13,16 +13,10 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 # Mock data for initial development
 drone_data = {
     "1": {
-        "lat": -35.3632,
-        "lon": 149.1652,
-        "alt": 10,
-        "status": "STANDBY"
+        "status": "NOT INITIALIZED"
     },
     "2": {
-        "lat": -35.3634,
-        "lon": 149.1654,
-        "alt": 15,
-        "status": "STANDBY"
+        "status": "NOT INITIALIZED"
     }
 }
 

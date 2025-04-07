@@ -51,8 +51,9 @@ def execute_command(command):
         home_gps["alt"] = msg.alt / 1e3
         params = command.split()
         print("Executing TAKEOFF")
+        print(params)
         if len(params)==1:
-            alt = 10
+            alt = 3 # Default 3m takeoff alt
         elif len(params)>2:
             print("Invalid takeoff command")
             return
@@ -60,7 +61,7 @@ def execute_command(command):
             alt = float(params[1])
 
         msg = connection.recv_match(type='LOCAL_POSITION_NED', blocking=True)
-        current_command = f"ABSOLUTE_WAYPOINT {msg.x} {msg.y} {msg.z-10}"
+        current_command = f"ABSOLUTE_WAYPOINT {msg.x} {msg.y} {msg.z-alt}"
 
         # print("TAKEOFF EST POS ", current_command)
         
@@ -132,7 +133,7 @@ def execute_command(command):
 
         home_lat = int(home_gps["lat"] * 1e7)
         home_lon = int(home_gps["lon"] * 1e7)
-        hover_altitude = 10
+        hover_altitude = 7     # Hover altitude
         target_alt = int(hover_altitude)
 
         print(f"Home GPS: {home_gps}, Target alt: {target_alt}")
