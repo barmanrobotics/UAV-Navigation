@@ -45,6 +45,7 @@ def send_gps_to_server(label, lat, lon, alt):
         print(f"Error sending gps data to server: {e}")
 
 def receive_server_commands():
+    global disable_avoidance_detection
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         server_socket.bind((HOST, SERVER_PORT))
         server_socket.listen()
@@ -64,6 +65,11 @@ def receive_server_commands():
                     continue
 
                 target_label, command_data = parts
+                if command_data == "LAND":
+                    disable_avoidance_detection = True
+                elif command_data =="TAKEOFF":
+                    disable_avoidance_detection = False
+                
                 if target_label in connections:
                     try:
                         connections[target_label].sendall(command_data.encode())
@@ -110,7 +116,6 @@ def handle_client(conn, label):
                                 horizontal_radius = 7
                                 vertical_radius = 2
 
-                                print("disable_avoidance_detection", disable_avoidance_detection)
                                 if disable_avoidance_detection:
                                     continue
 
@@ -227,10 +232,10 @@ def send_command():
                     print("Invalid WAYPOINT coordinates. Must be numbers.")
                     continue
             
-            print(command)
-            if command.startswith("LAND"):
-                print("COMMAND IS LAND")
+            if command == "LAND":
                 disable_avoidance_detection = True
+            elif command == "TAKEOFF":
+                disable_avoidance_detection = False
 
             # Send command to drone
             if target_label in connections:
