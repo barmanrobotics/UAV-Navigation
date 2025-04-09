@@ -7,33 +7,35 @@ import numpy as np
 import math
 import time
 from pymavlink import mavutil
-from picamera2 import Picamera2
 
-connection = mavutil.mavlink_connection('udpin:localhost:14551')
+try:
+    from picamera2 import Picamera2
+
+    x_res= 640 # pixels  #A resolution of 1014 x 760 works well and gives the same 30fps output
+    y_res = 480# pixels
+    FPS = 120
+
+    picam2 = Picamera2()
+    camera_config = picam2.create_preview_configuration(
+        raw={"size": (1536, 864)},
+        main={"format": 'RGB888', "size": (x_res,y_res)},
+        controls={"FrameRate": FPS}
+    )
+    # Apply the configuration to the camera
+    picam2.configure(camera_config)
+    picam2.start()
+    #picam2.set_controls({"AfMode": controls.AfModeEnum.Continuous}) #comment this out if you don't want autofocus
+    print("Waiting for camera to start")
+    time.sleep(1)
+    print("Camera Started")
+except:
+    print("Camera failed to initialize.")
+
+connection = mavutil.mavlink_connection('udpin:localhost:14550')
 
 # Wait for a heartbeat to confirm connection
 connection.wait_heartbeat()
 print("Connected to the vehicle")
-
-x_res= 640 # pixels  #A resolution of 1014 x 760 works well and gives the same 30fps output
-y_res = 480# pixels
-FPS = 120
-
-picam2 = Picamera2()
-camera_config = picam2.create_preview_configuration(
-    raw={"size": (1536, 864)},
-    main={"format": 'RGB888', "size": (x_res,y_res)},
-    controls={"FrameRate": FPS}
-)
-# Apply the configuration to the camera
-picam2.configure(camera_config)
-picam2.start()
-#picam2.set_controls({"AfMode": controls.AfModeEnum.Continuous}) #comment this out if you don't want autofocus
-print("Waiting for camera to start")
-time.sleep(1)
-print("Camera Started")
-
-
 
 def get_unique_filename(base_name):
     #Stores the csv files with new names without overwriting
@@ -320,8 +322,6 @@ def precision_land_mode():
     
 
     try:
-
-        while True:
             time.sleep(0.02)
             # receive header
             img = picam2.capture_array()
@@ -390,6 +390,70 @@ def precision_land_mode():
         # Save all marker positions once per execution
         save_marker_positions(marker_positions)
 
+def waypoint(x_offset, y_offset, z_offset):
+    from way_point import way_point
+    
+    msg = connection.recv_match(type='LOCAL_POSITION_NED', blocking=True)
+
+    current_x = msg.x
+    current_y = msg.y
+    current_z = msg.z
+    
+    target_x = current_x + x_offset
+    target_y = current_y + y_offset
+    target_z = current_z - z_offset
+
+    way_point(connection, target_x, target_y, target_z)
+
+def rth(home_gps, alt):
+    connection.mav.set_mode_send(
+        connection.target_system,
+        mavutil.mavlink.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED,
+        4
+    )
+    time.sleep(1)
+
+    home_lat = int(home_gps["lat"] * 1e7)
+    home_lon = int(home_gps["lon"] * 1e7)
+    hover_altitude = alt     # Hover altitude
+    target_alt = int(hover_altitude)
+
+    print(f"Home GPS: {home_gps}, Target alt: {target_alt}")
+
+    connection.mav.set_position_target_global_int_send(
+            0,
+            connection.target_system,
+            connection.target_component,
+            mavutil.mavlink.MAV_FRAME_GLOBAL_RELATIVE_ALT_INT,
+            0b0000111111111000,
+            home_lat,
+            home_lon,
+            target_alt,
+            0, 0, 0,
+            0, 0, 0,
+            0, 0
+    )
+
+def land():
+    connection.mav.command_long_send(
+        connection.target_system,
+        connection.target_component,
+        mavutil.mavlink.MAV_CMD_NAV_LAND,
+        0, 0, 0,
+        0, 0, 0,
+        0, 0
+    )
+    
+def get_home_gps():
+    home_gps = {"lat": 0, "lon": 0, "alt": 0}
+    msg = connection.recv_match(type='GLOBAL_POSITION_INT', blocking=True)
+    while (not msg):
+        print(msg)
+    print("Got home gps")
+    home_gps["lat"] = msg.lat / 1e7
+    home_gps["lon"] = msg.lon / 1e7
+    home_gps["alt"] = msg.alt / 1e3
+
 # Example usage
 #detect_aruco_tags()
 
@@ -398,8 +462,34 @@ def precision_land_mode():
 
 #mavlink20 = 'MAVLINK20' in os.environ
 #print(mavlink20)
+
+while True:
+    if input("Takeoff? y/n ")=="y":
+        break
 set_flight_mode('GUIDED')
 arm_disarm_drone(1)
 time.sleep(2)
 takeoff(5)
+
+while True:
+    if input("Waypoint? y/n ")!="y":
+        continue
+    try:
+        x = int(input("x: "))
+        y = int(input("y: "))
+        z = int(input("z: "))
+    except:
+        continue
+    if input(f"Confirm waypoint: {x} {y} {z} ? y/n ")=="y":
+        break
+waypoint(x, y, z)
+
+while True:
+    if input("RTH? y/n ")=="y":
+        break
+set_flight_mode("RTL")
+
+while True:
+    if input("Land? y/n ")=="y":
+        break
 precision_land_mode()

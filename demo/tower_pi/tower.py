@@ -17,6 +17,7 @@ server_running = True
 avoidance_enabled = 2
 stage_started = time.time()
 disable_avoidance_detection = False
+force_disable_avoidance_detection = True
 
 def haversine(coord1, coord2):
     R = 6371000  # Radius of Earth in meters
@@ -65,9 +66,9 @@ def receive_server_commands():
                     continue
 
                 target_label, command_data = parts
-                if command_data == "LAND":
+                if command_data=="LAND" or command_data=="PRECISION_LAND":
                     disable_avoidance_detection = True
-                elif command_data =="TAKEOFF":
+                elif command_data=="TAKEOFF":
                     disable_avoidance_detection = False
                 
                 if target_label in connections:
@@ -116,7 +117,7 @@ def handle_client(conn, label):
                                 horizontal_radius = 7
                                 vertical_radius = 2
 
-                                if disable_avoidance_detection:
+                                if disable_avoidance_detection or force_disable_avoidance_detection:
                                     continue
 
                                 if (distance < horizontal_radius) and (alt_diff < vertical_radius):
@@ -215,7 +216,7 @@ def send_command():
             command = ' '.join(input_split[1:])
             
             # Validate command type
-            if command not in ["TAKEOFF", "RTH", "STANDBY", "RESUME", "LAND"] and not command.startswith("WAYPOINT") and not command.startswith("ABSOLUTE_WAYPOINT"):
+            if command not in ["TAKEOFF", "RTH", "STANDBY", "RESUME", "LAND", "PRECISION_LAND"] and not command.startswith("WAYPOINT") and not command.startswith("ABSOLUTE_WAYPOINT"):
                 print("Invalid command.")
                 print("Available commands: TAKEOFF, WAYPOINT <x> <y> <z>, RTH, STANDBY")
                 continue

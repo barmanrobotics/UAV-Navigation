@@ -168,9 +168,9 @@ def execute_command(command):
             0, 0
         )
     elif command == "PRECISION_LAND":
+        from precision_landing import precision_land
         print("Executing Precision Landing via external script")
-        from precision_landing import land
-        land.precision_landing(connection)
+        precision_land.precision_landing(connection)
 
     elif command == "LAND":
         print("Landing...")

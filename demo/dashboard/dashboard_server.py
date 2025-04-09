@@ -16,10 +16,7 @@ drone_data = {
         "status": "NOT INITIALIZED"
     },
     "2": {
-        "lat": -35.3634,
-        "lon": 149.1654,
-        "alt": 15,
-        "status": "STANDBY"
+        "status": "NOT INITIALIZED"
     }
 }
 
@@ -30,86 +27,45 @@ tower_data = {
     }
 }
 
-# Tower Pi configuration (Raspberry Pi)
-TOWER_IP = '10.203.181.232'  # IP address of the Raspberry Pi
-TOWER_PORT = 6553            # Port for receiving GPS data
-TOWER_COMMAND_PORT = 6542    # Port for sending commands
+TOWER_IP = "0.0.0.0"
+TOWER_PORT = 6553
+TOWER_COMMAND_PORT = 6542
 
 def receive_gps_data():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
-        server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        try:
-            server_socket.bind(('0.0.0.0', TOWER_PORT))  # Listen on all interfaces
-            server_socket.listen()
-            print(f"Listening for GPS data from tower at {TOWER_IP} on port {TOWER_PORT}...")
+        server_socket.bind((TOWER_IP, TOWER_PORT))
+        server_socket.listen()
+        print(f"Listening for GPS data from tower on port {TOWER_PORT}...")
 
-            while True:
-                conn, addr = server_socket.accept()
-                print(f"Received connection from {addr}")
-                with conn:
-                    data = conn.recv(1024).decode()
-                    if not data:
-                        continue
+        while True:
+            conn, addr = server_socket.accept()
+            with conn:
+                data = conn.recv(1024).decode()
+                if not data:
+                    continue
 
-                    try:
-                        print(f"Received raw data: {data}")
-                        gps_update = json.loads(data)
-                        drone_id = gps_update["drone_id"]
-                        lat, lon, alt = gps_update["lat"], gps_update["lon"], gps_update["alt"]
-                        
-                        print(f"Parsed GPS data - Drone {drone_id}: lat={lat}, lon={lon}, alt={alt}")
-                        
-                        # Create drone entry if it doesn't exist
-                        if drone_id not in drone_data:
-                            drone_data[drone_id] = {"status": "STANDBY"}
-                            print(f"Created new drone entry for Drone {drone_id}")
-                            
-                        current_status = drone_data[drone_id].get("status", "STANDBY")
-                        drone_data[drone_id] = {
-                            "lat": lat,
-                            "lon": lon,
-                            "alt": alt,
-                            "status": current_status
-                        }
-                        print(f"Updated drone {drone_id} data: {drone_data[drone_id]}")
+                try:
+                    gps_update = json.loads(data)
+                    drone_id = gps_update["drone_id"]
+                    lat, lon, alt = gps_update["lat"], gps_update["lon"], gps_update["alt"]
+                    current_status = drone_data[drone_id]["status"]
+                    drone_data[drone_id] = {
+                        "lat": lat,
+                        "lon": lon,
+                        "alt": alt,
+                        "status": current_status
+                    }
 
-                    except json.JSONDecodeError as e:
-                        print(f"Invalid GPS data format received: {e}")
-                        print(f"Raw data was: {data}")
-                    except KeyError as e:
-                        print(f"Missing key in GPS data: {e}")
-                        print(f"Data received: {data}")
-                    except Exception as e:
-                        print(f"Error processing GPS data: {e}")
-                        print(f"Data received: {data}")
-        except Exception as e:
-            print(f"Error setting up GPS receiver: {e}")
-            time.sleep(5)  # Wait before retrying
+                except json.JSONDecodeError:
+                    print("Invalid GPS data format received")
 
 def send_command_to_tower(drone_id, command):
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            print(f"Connecting to tower at {TOWER_IP}:{TOWER_COMMAND_PORT}...")
             s.connect((TOWER_IP, TOWER_COMMAND_PORT))
             command_message = f"{drone_id} {command}"
-            print(f"Sending command: {command_message}")
+            drone_data[drone_id]["status"] = " ".join(command_message.split()[1:])
             s.sendall(command_message.encode())
-            
-            # Update local status
-            if drone_id in drone_data:
-                drone_data[drone_id]["status"] = command.split()[0]
-                print(f"Updated drone {drone_id} status to {drone_data[drone_id]['status']}")
-            
-            # Wait for response
-            try:
-                s.settimeout(2)
-                response = s.recv(1024).decode()
-                print(f"Tower response: {response}")
-            except socket.timeout:
-                print("No response from tower (timeout)")
-                
-    except ConnectionRefusedError:
-        print(f"Connection refused by tower at {TOWER_IP}:{TOWER_COMMAND_PORT}")
     except Exception as e:
         print(f"Error sending command to tower: {e}")
         
@@ -127,8 +83,6 @@ def get_data():
 @socketio.on('connect')
 def handle_connect():
     print('Client connected')
-    # Send initial data to the client
-    socketio.emit('data_update', {"drones": drone_data, "towers": tower_data})
 
 @socketio.on('disconnect')
 def handle_disconnect():
@@ -141,23 +95,24 @@ def handle_command(data):
     command = data['command']
     print(f"Received command for Drone {drone_id}: {command}")
     
-    send_command_to_tower(drone_id, command)
+    if drone_id in drone_data:
+        send_command_to_tower(drone_id, command)
 
 def background_update():
-    """Send real-time updates to connected clients"""
+    """Simulate real-time updates from the tower system"""
     while True:
+        # In a real implementation, this would get data from the tower
         socketio.emit('data_update', {"drones": drone_data, "towers": tower_data})
         time.sleep(1)
 
 if __name__ == '__main__':
     # Start the background thread for updates
-    update_thread = threading.Thread(target=background_update, daemon=True)
+    update_thread = threading.Thread(target=background_update)
+    update_thread.daemon = True
     update_thread.start()
 
-    # Start the GPS data receiver thread
     gps_thread = threading.Thread(target=receive_gps_data, daemon=True)
     gps_thread.start()
     
-    # Start the web server
-    print("Starting dashboard server...")
-    socketio.run(app, host='0.0.0.0', port=5001, debug=False)
+    # Start the web server with debug mode off
+    socketio.run(app, host='0.0.0.0', port=5000, debug=False)
