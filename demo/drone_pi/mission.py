@@ -123,7 +123,7 @@ def execute_command(command):
         except Exception as e:
             print(f"Error executing waypoint navigation: {e}")
 
-    elif command == "RTH":        
+    elif command == "RTH":
         connection.mav.set_mode_send(
             connection.target_system,
             mavutil.mavlink.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED,
