@@ -5,8 +5,8 @@ import os
 import time
 import json
 
-HOST = '0.0.0.0'  # Listen on all available network interfaces
-PORTS = [14550, 14560]
+HOST = '0.0.0.0'  # Changed to localhost for local testing
+PORTS = [14551]
 SERVER_PORT = 6542
 COMM_PORT = 6553
 
@@ -32,53 +32,81 @@ def haversine(coord1, coord2):
     return R * c
 
 def send_gps_to_server(label, lat, lon, alt):
+    global last_connection_attempt
+    current_time = time.time()
+    
+    # Only try to reconnect every 10 seconds to avoid spamming
+    if hasattr(send_gps_to_server, 'last_attempt') and current_time - send_gps_to_server.last_attempt < 10:
+        return
+        
+    send_gps_to_server.last_attempt = current_time
+    
     try:
+        # Use the dashboard server address - this should be the IP where dashboard_server.py is running
+        dashboard_ip = "127.0.0.1"  # For local testing
+        
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.connect((HOST, COMM_PORT))
-            gps_message = json.dumps({
-                "drone_id": label,
-                "lat": lat,
-                "lon": lon,
-                "alt": alt
-            })
-            s.sendall(gps_message.encode())
+            s.settimeout(2)  # Set a timeout for connection attempts
+            try:
+                s.connect((dashboard_ip, COMM_PORT))
+                gps_message = json.dumps({
+                    "drone_id": label,
+                    "lat": lat,
+                    "lon": lon,
+                    "alt": alt
+                })
+                s.sendall(gps_message.encode())
+                print(f"Successfully sent GPS data to dashboard: Drone {label} at {lat}, {lon}, {alt}")
+            except ConnectionRefusedError:
+                print(f"Dashboard server not running on {dashboard_ip}:{COMM_PORT}")
+            except socket.timeout:
+                print(f"Connection to dashboard timed out on {dashboard_ip}:{COMM_PORT}")
     except Exception as e:
-        print(f"Error sending gps data to server: {e}")
+        print(f"Error sending GPS data to server: {e}")
 
 def receive_server_commands():
     global disable_avoidance_detection
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
-        server_socket.bind((HOST, SERVER_PORT))
-        server_socket.listen()
-        print("Listening for server commands")
+        server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            server_socket.bind((HOST, SERVER_PORT))
+            server_socket.listen()
+            print(f"Listening for server commands on {HOST}:{SERVER_PORT}")
 
-        while True:
-            conn, addr = server_socket.accept()
-            with conn:
-                command = conn.recv(1024).decode()
-                if not command:
-                    continue
+            while True:
+                try:
+                    conn, addr = server_socket.accept()
+                    with conn:
+                        command = conn.recv(1024).decode()
+                        if not command:
+                            continue
 
-                print(f"Received command from server: {command}")
-                parts = command.split(maxsplit=1)
-                if len(parts) < 2:
-                    print("Invalid command format")
-                    continue
+                        print(f"Received command from server: {command}")
+                        parts = command.split(maxsplit=1)
+                        if len(parts) < 2:
+                            print("Invalid command format")
+                            continue
 
-                target_label, command_data = parts
-                if command_data=="LAND" or command_data=="PRECISION_LAND":
-                    disable_avoidance_detection = True
-                elif command_data=="TAKEOFF":
-                    disable_avoidance_detection = False
-                
-                if target_label in connections:
-                    try:
-                        connections[target_label].sendall(command_data.encode())
-                    except Exception as e:
-                        print(f"Error sending command to Drone {target_label}: {e}")
-                else:
-                    print(f"No connection with Drone {target_label}")
-
+                        target_label, command_data = parts
+                        if command_data=="LAND" or command_data=="PRECISION_LAND":
+                            disable_avoidance_detection = True
+                        elif command_data=="TAKEOFF":
+                            disable_avoidance_detection = False
+                        
+                        if target_label in connections:
+                            try:
+                                connections[target_label].sendall(command_data.encode())
+                            except Exception as e:
+                                print(f"Error sending command to Drone {target_label}: {e}")
+                        else:
+                            print(f"No connection with Drone {target_label}")
+                except Exception as e:
+                    print(f"Error accepting command connection: {e}")
+        except Exception as e:
+            print(f"Failed to bind server command socket to {HOST}:{SERVER_PORT}: {e}")
+            print("Retrying in 5 seconds...")
+            time.sleep(5)
+            receive_server_commands()  # Retry
 
 def handle_client(conn, label):
     global avoidance_enabled, stage_started, disable_avoidance_detection
