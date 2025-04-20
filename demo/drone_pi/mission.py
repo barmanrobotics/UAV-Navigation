@@ -5,20 +5,24 @@ import threading
 import sys
 
 # Client Configuration
-HUB_IP = 'localhost'
-if len(sys.argv) < 2:
-    print("Usage: python3 node_pi_client.py <PORT>")
-    sys.exit(1)
-
-PORT = int(sys.argv[1])
+TOWER_IP = '127.0.0.1'  # Tower IP (localhost for testing)
+TOWER_PORT = 14551      # Port that tower.py is listening on (from PORTS array)
 
 # MAVLink Connection to PX4
-connection = mavutil.mavlink_connection(f'udpin:localhost:{PORT}')
+if len(sys.argv) < 2:
+    print("Usage: python3 mission.py <MAVLINK_PORT>")
+    sys.exit(1)
+
+MAVLINK_PORT = int(sys.argv[1])
+print(f"Connecting to MAVLink on port {MAVLINK_PORT}...")
+
+connection = mavutil.mavlink_connection(f'udpin:localhost:{MAVLINK_PORT}')
 connection.wait_heartbeat()
+print("MAVLink heartbeat received!")
 
 current_command = None  # Track ongoing command
-
 home_gps = {"lat": 0, "lon": 0, "alt": 0}
+reconnect_delay = 5  # Initial reconnect delay in seconds
 
 def send_gps_coordinates(client):
     while True:
@@ -29,10 +33,15 @@ def send_gps_coordinates(client):
                 lon = msg.lon / 1e7
                 alt = msg.alt / 1e3
                 gps_data = f"GPS {lat} {lon} {alt}"
-                client.sendall(gps_data.encode())
+                try:
+                    client.sendall(gps_data.encode())
+                    print(f"Sent GPS: {lat}, {lon}, {alt}")
+                except Exception as e:
+                    print(f"Error sending GPS data: {e}")
+                    break
             # time.sleep(0.5)  # Add delay to prevent flooding
         except Exception as e:
-            print(f"Error sending GPS data: {e}")
+            print(f"Error getting GPS data: {e}")
             break
 
 def execute_command(command):
@@ -235,33 +244,51 @@ def receive_messages(client_socket):
 
 # Main function
 def main():
-    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    try:
-        client.connect((HUB_IP, PORT))
-        print(f"Connected to server at {HUB_IP}:{PORT}")
-        
-        # Start receiving messages in a separate thread
-        receive_thread = threading.Thread(target=receive_messages, args=(client,))
-        receive_thread.daemon = True
-        receive_thread.start()
-        
-        # Start sending GPS coordinates in a separate thread
-        gps_thread = threading.Thread(target=send_gps_coordinates, args=(client,))
-        gps_thread.daemon = True
-        gps_thread.start()
-        
-        # Continue main loop
-        while True:
-            try:
-                client.send("Drone status: OK".encode())
-                time.sleep(20)
-            except:
-                break
+    global reconnect_delay
     
-    except Exception as e:
-        print(f"Connection error: {e}")
-    finally:
-        client.close()
+    while True:
+        client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            print(f"Connecting to tower at {TOWER_IP}:{TOWER_PORT}...")
+            client.settimeout(10)  # Set a connection timeout
+            client.connect((TOWER_IP, TOWER_PORT))
+            print(f"Connected to tower at {TOWER_IP}:{TOWER_PORT}")
+            
+            # Reset reconnect delay on successful connection
+            reconnect_delay = 5
+            
+            # Start receiving messages in a separate thread
+            receive_thread = threading.Thread(target=receive_messages, args=(client,))
+            receive_thread.daemon = True
+            receive_thread.start()
+            
+            # Start sending GPS coordinates in a separate thread
+            gps_thread = threading.Thread(target=send_gps_coordinates, args=(client,))
+            gps_thread.daemon = True
+            gps_thread.start()
+            
+            # Continue main loop
+            while True:
+                try:
+                    client.send("Drone status: OK".encode())
+                    time.sleep(20)
+                except:
+                    print("Connection to tower lost, attempting to reconnect...")
+                    break
+        
+        except ConnectionRefusedError:
+            print(f"Connection refused. Tower not running or not listening on {TOWER_IP}:{TOWER_PORT}")
+        except socket.timeout:
+            print("Connection attempt timed out")
+        except Exception as e:
+            print(f"Connection error: {e}")
+        finally:
+            client.close()
+            
+        # Implement exponential backoff for reconnection attempts
+        print(f"Retrying connection in {reconnect_delay} seconds...")
+        time.sleep(reconnect_delay)
+        reconnect_delay = min(reconnect_delay * 2, 60)  # Double delay up to 60 seconds max
 
 if __name__ == "__main__":
     main()

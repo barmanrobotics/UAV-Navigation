@@ -8,20 +8,31 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 const droneMarkers = {};
 const towerMarkers = {};
 
+// For debugging
+function logData(message, data) {
+    console.log(message, JSON.parse(JSON.stringify(data)));
+}
+
 // Connect to the WebSocket server
 const socket = io();
+console.log("Socket.io connection established");
 
 // Initial data load
 fetch('/api/data')
     .then(response => response.json())
     .then(data => {
+        logData("Initial data load:", data);
         updateMap(data);
         updateDroneList(data.drones);
         updateDroneSelect(data.drones);
+    })
+    .catch(error => {
+        console.error("Error fetching initial data:", error);
     });
 
 // Listen for real-time updates
 socket.on('data_update', (data) => {
+    logData("Received data update:", data);
     updateMap(data);
     updateDroneList(data.drones);
     updateDroneSelect(data.drones);
@@ -31,27 +42,33 @@ socket.on('data_update', (data) => {
 function updateMap(data) {
     // Update drone markers
     for (const [id, drone] of Object.entries(data.drones)) {
+        // Skip drones without location data
+        if (drone.lat === undefined || drone.lon === undefined) {
+            console.log(`Drone ${id} missing location data:`, drone);
+            continue;
+        }
+        
         const position = [drone.lat, drone.lon];
         
         if (id in droneMarkers) {
             droneMarkers[id].setLatLng(position);
         } else {
+            console.log(`Creating new marker for Drone ${id} at position:`, position);
             const droneIcon = L.divIcon({
                 html: `<div class="drone-icon" style="font-size: 30px;">🚁</div>`,
                 className: 'drone-marker',
                 iconSize: [30, 30],
                 iconAnchor: [15, 15],
-                popupAnchor: [0, -15],
-                className: 'drone-marker-fixed' 
+                popupAnchor: [0, -15]
             });
             
             droneMarkers[id] = L.marker(position, {icon: droneIcon})
                 .addTo(map)
-                .bindPopup(`Drone ${id}<br>Status: ${drone.status}<br>Alt: ${drone.alt}m`);
+                .bindPopup(`Drone ${id}<br>Status: ${drone.status || "Unknown"}<br>Alt: ${drone.alt || 0}m`);
         }
         
         // Update popup content
-        droneMarkers[id].setPopupContent(`Drone ${id}<br>Status: ${drone.status}<br>Alt: ${drone.alt}m`);
+        droneMarkers[id].setPopupContent(`Drone ${id}<br>Status: ${drone.status || "Unknown"}<br>Alt: ${(drone.alt || 0).toFixed(1)}m`);
     }
     
     // Update tower markers
@@ -65,9 +82,8 @@ function updateMap(data) {
                 html: `<div class="tower-icon" style="font-size: 30px;">🗼</div>`,
                 className: 'tower-marker',
                 iconSize: [30, 30],
-                iconAnchor: [15, 15],  // Center the icon
-                popupAnchor: [0, -15],  // Position popup above the icon
-                className: 'tower-marker-fixed'  // New class for fixed-size icons
+                iconAnchor: [15, 15],
+                popupAnchor: [0, -15]
             });
             
             towerMarkers[id] = L.marker(position, {icon: towerIcon})
@@ -79,6 +95,7 @@ function updateMap(data) {
 
 // Function to update the drone list
 function updateDroneList(drones) {
+    console.log("Updating drone list with:", drones);
     const droneList = document.getElementById('drone-list');
     droneList.innerHTML = '';
     
@@ -86,11 +103,24 @@ function updateDroneList(drones) {
         const droneItem = document.createElement('div');
         droneItem.className = 'drone-item';
         droneItem.setAttribute('data-drone-id', id);
+        
+        // Only show position if lat/lon are available
+        let positionText = 'Position: Unknown';
+        if (drone.lat !== undefined && drone.lon !== undefined) {
+            positionText = `Position: ${drone.lat.toFixed(6)}, ${drone.lon.toFixed(6)}`;
+        }
+        
+        // Only show altitude if available
+        let altitudeText = 'Altitude: Unknown';
+        if (drone.alt !== undefined) {
+            altitudeText = `Altitude: ${drone.alt.toFixed(1)}m`;
+        }
+        
         droneItem.innerHTML = `
             <h3>Drone ${id}</h3>
-            <p>Position: ${drone.lat.toFixed(6)}, ${drone.lon.toFixed(6)}</p>
-            <p>Altitude: ${drone.alt.toFixed(1)}m</p>
-            <p>Status: <span class="active-command">${drone.status}</span></p>
+            <p>${positionText}</p>
+            <p>${altitudeText}</p>
+            <p>Status: <span class="active-command">${drone.status || "Unknown"}</span></p>
         `;
         droneList.appendChild(droneItem);
     }
@@ -98,6 +128,7 @@ function updateDroneList(drones) {
 
 // Function to update the drone select dropdown
 function updateDroneSelect(drones) {
+    console.log("Updating drone select with:", drones);
     const droneSelect = document.getElementById('drone-select');
     const currentValue = droneSelect.value;
     
@@ -109,6 +140,7 @@ function updateDroneSelect(drones) {
     // Add new drones
     for (const id in drones) {
         if (!currentOptions.includes(id)) {
+            console.log(`Adding drone ${id} to select dropdown`);
             const option = document.createElement('option');
             option.value = id;
             option.textContent = `Drone ${id}`;
