@@ -54,13 +54,30 @@ function updateMap(data) {
             droneMarkers[id].setLatLng(position);
         } else {
             console.log(`Creating new marker for Drone ${id} at position:`, position);
+            // const droneIcon = L.divIcon({
+            //     html: `<div class="drone-icon" style="font-size: 30px;">🚁</div>`,
+            //     className: 'drone-marker',
+            //     iconSize: [30, 30],
+            //     iconAnchor: [15, 15],
+            //     popupAnchor: [0, -15]
+            // });
+            // const heading = drone.hdg || 0;
+            // const droneIcon = L.divIcon({
+            //     html: `<div class="drone-icon" style="font-size: 30px; transform: rotate(${heading}deg);">🚁</div>`,
+            //     className: 'drone-marker',
+            //     iconSize: [30, 30],
+            //     iconAnchor: [15, 15],
+            //     popupAnchor: [0, -15]
+            // });
+            const heading = ((drone.hdg ?? 0) - 90 + 360) % 360;
             const droneIcon = L.divIcon({
-                html: `<div class="drone-icon" style="font-size: 30px;">🚁</div>`,
+                html: `<img src="static/drone-icon.png" class="drone-icon" style="width: 40px; transform: rotate(${heading-45.}deg);">`,
                 className: 'drone-marker',
-                iconSize: [30, 30],
-                iconAnchor: [15, 15],
-                popupAnchor: [0, -15]
+                iconSize: [40, 40],
+                iconAnchor: [20, 20],
+                popupAnchor: [0, -20]
             });
+
             
             droneMarkers[id] = L.marker(position, {icon: droneIcon})
                 .addTo(map)
@@ -68,7 +85,16 @@ function updateMap(data) {
         }
         
         // Update popup content
-        droneMarkers[id].setPopupContent(`Drone ${id}<br>Status: ${drone.status || "Unknown"}<br>Alt: ${(drone.alt || 0).toFixed(1)}m`);
+        // droneMarkers[id].setPopupContent(`Drone ${id}<br>Status: ${drone.status || "Unknown"}<br>Alt: ${(drone.alt || 0).toFixed(1)}m`);
+
+        droneMarkers[id].setLatLng(position);
+
+        // Rotate icon based on heading
+        const heading = drone.hdg || 0;
+        const iconDiv = droneMarkers[id].getElement()?.querySelector('.drone-icon');
+        if (iconDiv) {
+            iconDiv.style.transform = `rotate(${heading}deg)`;
+        }
     }
     
     // Update tower markers
@@ -116,10 +142,17 @@ function updateDroneList(drones) {
             altitudeText = `Altitude: ${drone.alt.toFixed(1)}m`;
         }
         
+        // Only show velocity if available
+        let velocityText = 'Velocity: Unknown';
+        if (drone.alt !== undefined) {
+            velocityText = `Velocity: ${drone.vel.toFixed(1)*1}cm/s`;
+        }
+
         droneItem.innerHTML = `
             <h3>Drone ${id}</h3>
             <p>${positionText}</p>
             <p>${altitudeText}</p>
+            <p>${velocityText}</p>
             <p>Status: <span class="active-command">${drone.status || "Unknown"}</span></p>
         `;
         droneList.appendChild(droneItem);
