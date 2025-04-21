@@ -9,7 +9,6 @@ import math
 import time
 from pymavlink import mavutil
 import random
-from simple_pid import PID
 
 # connect to WebotsArduVehicle
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -36,7 +35,7 @@ def save_marker_positions(marker_positions):
         file_name = get_unique_filename(f"marker_{marker_id}")
         with open(file_name, mode='w', newline='') as file:
             writer = csv.writer(file)
-            writer.writerow(["X", "Y", "Z", "V_X", "V_Y", "V_Z"])  # Write header
+            writer.writerow(["X", "Y", "Z"])  # Write header
             writer.writerows(positions)
         print(f"Saved positions for marker {marker_id} in {file_name}")
 
@@ -61,7 +60,7 @@ def send_velocity(vx,vy,vz):
         0,       # time_boot_ms (not used)
         0, 0,    # target_system, target_component
         mavutil.mavlink.MAV_FRAME_BODY_NED,  # Frame of reference (Body frame)
-        0b100111000111,  # Control velocity only
+        0b110111000111,  # Control velocity only
         0, 0, 0,  # Position x, y, z (not used)
         vx, vy, vz,  # Velocity x, y, z (used)
         0, 0, 0,  # Acceleration (not used)
@@ -91,7 +90,7 @@ def send_acceleration(ax, ay, vz):
     connection.mav.set_position_target_local_ned_send(
         0,       # time_boot_ms (not used)
         0, 0,    # target_system, target_component
-        mavutil.mavlink.MAV_FRAME_BODY_OFFSET,  # Frame of reference (Body frame)
+        mavutil.mavlink.MAV_FRAME_BODY_NED,  # Frame of reference (Body frame)
         0b110000000000,  # Control velocity only
         0, 0, 0,  # Position x, y, z (not used)
         0, 0, vz,  # Velocity x, y, z
@@ -108,17 +107,14 @@ def precision_land_velocity():
     #distance from the center of the tag along x or y axes where you'd like the center of the camera to land
     #if you want the center of the camera to land at the center of the tag, set it to 0.
 
-    #marker_size = float(input("Please enter the marker size in cm: "))
-    #offset_x = float(input("Please enter the x offset distance in cm. Back is positive: "))
-    #offset_y = float(input("Please enter the y offset distance in cm. Right is positive: "))
-    marker_size = 20
-    offset_x = 0
-    offset_y = 0
+    marker_size = float(input("Please enter the marker size in cm: "))
+    offset_x = float(input("Please enter the x offset distance in cm. Back is positive: "))
+    offset_y = float(input("Please enter the y offset distance in cm. Right is positive: "))
     #DESCENT_VELOCITY = float(input("Enter initial descent velocity: ")) 
     #ERROR_THRESHOLD = float(input("Enter threshold error: "))
     #marker_track = float(input("WHich marker ID you want to track? "))
-    DESCENT_VELOCITY = 0.5
-    ERROR_THRESHOLD = 0.01 # land within 1 cm of target
+    DESCENT_VELOCITY = 0.2
+    ERROR_THRESHOLD = 0.01
     marker_track = 0
 
     #x_res= 640 # pixels
@@ -145,31 +141,20 @@ def precision_land_velocity():
     
     i = 1
 
-    kp = 0.25
-    kd = 0.05
+    kp = 0.2
+    kd = 0.065
     ki = 0.0
 
-    # PID Controllers with optimized values
-    pid_x = PID(0.5, 0.0, 0.01, setpoint=0.0)
-    pid_y = PID(0.5, 0.0, 0.01, setpoint=0.0)
-    pid_x.sample_time = 0.01 
-    pid_y.sample_time = 0.01 
-    pid_x.output_limits = (-1, 1)
-    pid_y.output_limits = (-1, 1) 
-
-    start_time = time.time()
-    previous_time = 0
+    previous_time = time.time()
     previous_error_x = 0.0
     previous_error_y = 0.0
     error_sum_x = 0.0
     error_sum_y = 0.0
-    derivative_x = 0.0
-    derivative_y = 0.0
 
     try:
 
         while True:
-            time.sleep(0.0167)
+            time.sleep(0.1)
             # receive header
             header = s.recv(header_size)
             if len(header) != header_size:
@@ -206,6 +191,10 @@ def precision_land_velocity():
                     ret = aruco.estimatePoseSingleMarkers(markerCorner, marker_size, camera_matrix, dist_coefficients)
                     (rvec, tvec) = (ret[0][0,0,:], ret[1][0,0,:])
                     x, y, z = -tvec[1], tvec[0], tvec[2]
+                        
+                    if markerID not in marker_positions:
+                        marker_positions[markerID] = []
+                    marker_positions[markerID].append([x, y, z])
 
                     marker_position = f'MARKER {markerID}: x={x:.2f} y={y:.2f} z={z:.2f}'
 
@@ -250,38 +239,34 @@ def precision_land_velocity():
                         p_out_y = kp*error_y
 
                         current_time = time.time()
-                        if previous_time == 0:
-                            derivative_x = 0
-                            derivative_y = 0
-                            error_sum_x = 0
-                            error_sum_y = 0
+                        if i==1:
+                            dt = 0.1
+                            previous_error_x = error_x
+                            previous_error_y = error_y
+                            i+=1
                         else:
                             dt = current_time - previous_time
-                            derivative_x = (error_x - previous_error_x)/dt
-                            derivative_y = (error_y - previous_error_y)/dt
-                            error_sum_x += error_x*dt
-                            error_sum_y += error_y*dt  
+                        
+                        previous_time = current_time
+
+                        derivative_x = (error_x - previous_error_x)/dt
+                        derivative_y = (error_y - previous_error_y)/dt
+                        previous_error_x = error_x
+                        previous_error_y = error_y
 
                         d_out_x = kd*derivative_x
                         d_out_y = kd*derivative_y
 
+                        error_sum_x += error_x*dt
+                        error_sum_y += error_y*dt
+
                         i_out_x = ki*error_sum_x
                         i_out_y = ki*error_sum_y
-                        
-                        previous_time = current_time
-                        previous_error_x = error_x
-                        previous_error_y = error_y
 
-                        #v_x = p_out_x + d_out_x + i_out_x
-                        #v_y = p_out_y + d_out_y + i_out_y
 
-                        print(error_x)
+                        a_x = p_out_x + d_out_x + i_out_x
+                        a_y = p_out_y + d_out_y + i_out_y
 
-                        v_x = -pid_x(error_x)
-                        v_y = -pid_y(error_y)
-                        p, i, d = pid_x.components
-                        print(p, i, d)
-                        print (f"v_x: {v_x} v_y: {v_y}")
 
                         #ax = 0.01 + kp*(e_y) + kd*(e_y_t)
                         #ay = 0.01 + kp*(e_x) + kd*(e_x_t)
@@ -292,11 +277,11 @@ def precision_land_velocity():
                         #Sprint(f"e_x: {x_ang}, e_x_t: {e_x_t}")
                         
                         
-                        max_velocity = 20
-                        min_velocity = 0.0
+                        max_velocity = 0.4
+                        min_velocity = 0.01
 
-                        v_x = v_x if abs(error_x) > ERROR_THRESHOLD else 0
-                        v_y = v_y if abs(error_y) > ERROR_THRESHOLD else 0
+                        a_x = a_x if abs(error_x) > ERROR_THRESHOLD else 0
+                        a_y = a_y if abs(error_y) > ERROR_THRESHOLD else 0
 
                         def clamp(value):
                             if value > 0:
@@ -305,33 +290,35 @@ def precision_land_velocity():
                                 return min(-min_velocity, max(value, -max_velocity))
                             return 0  # Ensures zero remains zero
 
-                        v_x, v_y = clamp(v_x), clamp(v_y)
-
+                        a_x, a_y = clamp(a_x), clamp(a_y)
                         if ar_alt<100:
                             DESCENT_VELOCITY = 0.15
-                        else:
-                            DESCENT_VELOCITY = 0.5
 
-                        send_velocity(v_x,v_y, DESCENT_VELOCITY)
-                        print (f"v_x: {v_x} v_y: {v_y} v_z: {DESCENT_VELOCITY}")
+                        if random.random() < 0.2:  # 20% chance to trigger a gust
+                            a_x = random.uniform(-0.1, 0.1)
+                            a_y = random.uniform(-0.1, 0.1)
+                            print("gust of", a_x, a_y)
+                            send_acceleration(a_x,a_y,0)
+
+                        else:
+                            send_velocity(a_x,a_y, DESCENT_VELOCITY)
+                        print (f"v_y: {a_y} v_x: {a_x}")
                         print("")
+
+                        
                         
                         #yaw value of 0 is given to align the drone to true north
-                    
-                    if markerID not in marker_positions:
-                        marker_positions[markerID] = []
-                    marker_positions[markerID].append([x, y, z, v_x, v_y, DESCENT_VELOCITY])   
+                        
+
                     
                     # Draw marker ID and position
                     cv2.putText(frame, str(markerID), (topLeft[0], topLeft[1] - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
                     cv2.putText(frame, marker_position, (10, 50 + 20 * markerID), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (102, 0, 255), 2)
-
-                    
                     
             else:
                 print("aruco not detected")
                 print("continuing descent")       
-                send_velocity(0, 0, 0.2)
+                send_velocity(0, 0, 0.05)
 
                 
             # Display the frame
@@ -340,11 +327,6 @@ def precision_land_velocity():
             # Break the loop when 'q' is pressed
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
-
-            if (time.time() - start_time)>100:
-                print("time_over")
-                break
-
     except KeyboardInterrupt:
         print("\nKeyboardInterrupt detected. Saving data before exiting...")
     finally:

@@ -9,7 +9,6 @@ import math
 import time
 from pymavlink import mavutil
 import random
-from simple_pid import PID
 
 # connect to WebotsArduVehicle
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -20,6 +19,7 @@ connection = mavutil.mavlink_connection('udpin:localhost:14551')
 # Wait for a heartbeat to confirm connection
 connection.wait_heartbeat()
 print("Connected to the vehicle")
+
 
 def get_unique_filename(base_name):
     #Stores the csv files with new names without overwriting
@@ -36,9 +36,31 @@ def save_marker_positions(marker_positions):
         file_name = get_unique_filename(f"marker_{marker_id}")
         with open(file_name, mode='w', newline='') as file:
             writer = csv.writer(file)
-            writer.writerow(["X", "Y", "Z", "V_X", "V_Y", "V_Z"])  # Write header
+            writer.writerow(["X", "Y", "Z", "A_X", "A_Y", "V_Z"])  # Write header
             writer.writerows(positions)
         print(f"Saved positions for marker {marker_id} in {file_name}")
+
+def arm_disarm_drone(value):                      #set value to 1 to arm, 0 to disarm
+    connection.mav.command_long_send(
+        connection.target_system,
+        connection.target_component,
+        mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
+        0,
+        value, 0, 0, 0, 0, 0, 0
+    )
+    if value == 1:
+        print("Arming... ")
+        while True:
+            heartbeat = connection.recv_match(type='HEARTBEAT', blocking=True)
+            if heartbeat.base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED:
+                print("Drone is armed")
+                break
+            time.sleep(0.5)
+    else:
+        print("Disarming ...")
+        msg = connection.recv_match(type='COMMAND_ACK', blocking=True)
+        print(msg)
+    # Wait until armed
 
 def get_yaw(master):
     """
@@ -54,8 +76,29 @@ def get_yaw(master):
             yaw = msg.yaw * (180 / 3.141592653589793)  # Convert radians to degrees
             return yaw
 
+
+def send_yaw_command(master, target_yaw, yaw_speed, direction, relative):
+    """
+    Sends a MAV_CMD_CONDITION_YAW command to control the drone's yaw.
+
+    :param master: MAVLink connection object
+    :param target_yaw: Desired yaw angle (degrees)
+    :param yaw_speed: Yaw rotation speed (degrees/sec)
+    :param direction: 1 for clockwise, -1 for counterclockwise
+    :param relative: 1 for relative yaw, 0 for absolute yaw
+    """
+    master.mav.command_long_send(
+        master.target_system,    # Target system ID
+        master.target_component, # Target component ID
+        mavutil.mavlink.MAV_CMD_CONDITION_YAW, # Command ID
+        0,  # Confirmation
+        target_yaw,  # Target yaw angle in degrees
+        yaw_speed,   # Yaw speed in degrees/sec
+        direction,   # Direction: 1 = CW, -1 = CCW
+        relative,    # Relative (1) or absolute (0)
+        0, 0, 0)     # Unused parameters
+
 def send_velocity(vx,vy,vz):
-    #This function can take only velocity input
     # Send velocity command in the drone's NED frame
     connection.mav.set_position_target_local_ned_send(
         0,       # time_boot_ms (not used)
@@ -68,38 +111,105 @@ def send_velocity(vx,vy,vz):
         0, 0  # yaw, yaw_rate (not used)
     )
 
-
 def send_velocity_yaw(yaw,vx,vy,vz):
-    #This function can take velocity as well as yaw input. Yaw input is global and is in radians
-    #0 is North. pi is South etc
-    # Send velocity and yaw command in the drone's NED frame
+    # Send velocity command in the drone's NED frame
     connection.mav.set_position_target_local_ned_send(
         0,       # time_boot_ms (not used)
         0, 0,    # target_system, target_component
         1,  # Frame of reference (Body frame)
-        2503,  # Control velocity only
+        0b100111000111,  # Control velocity only
         0, 0, 0,  # Position x, y, z (not used)
         vx, vy, vz,  # Velocity x, y, z
         0, 0, 0,  # Acceleration (not used)
         yaw, 0  # yaw, yaw_rate (not used)
         )
+    print('setting yaw')
 
 def send_acceleration(ax, ay, vz):
-    #This function can take position, acceleration as well as velocity inputs
-    #Currently it takes ax, ay and vz (velocity of decend or climb depending upon sign)
     # Send velocity command in the drone's NED frame
     connection.mav.set_position_target_local_ned_send(
         0,       # time_boot_ms (not used)
         0, 0,    # target_system, target_component
-        mavutil.mavlink.MAV_FRAME_BODY_OFFSET,  # Frame of reference (Body frame)
-        0b110000000000,  # Control velocity only
+        mavutil.mavlink.MAV_FRAME_BODY_NED,  # Frame of reference (Body frame)
+        0b000000000000,  # Control velocity only
         0, 0, 0,  # Position x, y, z (not used)
         0, 0, vz,  # Velocity x, y, z
         ax, ay, 0,  # Acceleration (not used)
-        0, 0  # yaw, yaw_rate (not used)
+        0, 0 # yaw can be set, yaw_rate (not used)
+    )
+    
+def set_flight_mode(mode):
+    """
+    Change the flight mode of the vehicle.
+    
+    Args:
+        mode (str): The desired flight mode (e.g., "LAND", "GUIDED", "STABILIZE").
+    """
+    # Ensure mode is available in the MAVLink vehicle modes
+    mode_id = connection.mode_mapping().get(mode)
+    if mode_id is None:
+        print(f"Unknown mode: {mode}")
+        return
+
+    # Send command to change flight mode
+    connection.mav.command_long_send(
+        connection.target_system,  # target system
+        connection.target_component,  # target component
+        mavutil.mavlink.MAV_CMD_DO_SET_MODE,  # command
+        0,  # confirmation
+        mavutil.mavlink.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED,  # MAV_MODE_FLAG_CUSTOM_MODE_ENABLED
+        mode_id,  # mode to switch to
+        0, 0, 0, 0, 0  # unused parameters
     )
 
-def precision_land_velocity():
+    # Wait for the mode to change
+    while True:
+        # Receive a heartbeat message to check the current mode
+        msg = connection.recv_match(type='HEARTBEAT', blocking=True)
+        current_mode = mavutil.mode_string_v10(msg)
+        if current_mode == mode:
+            print(f"Mode changed to {mode}")
+            break
+        print(f"Waiting for mode change... (Current mode: {current_mode})")
+        time.sleep(1)
+   
+
+def get_flight_mode():
+    # Request the vehicle's heartbeat
+    msg = connection.recv_match(type='HEARTBEAT', blocking=True)
+    if msg:
+        # Get the flight mode
+        mode = mavutil.mode_string_v10(msg)
+        print(f"Current flight mode: {mode}")
+        return mode
+    else:
+        print("Failed to receive flight mode.")
+        return None
+    
+def set_land_mode():
+    """
+    Function to set the vehicle to LAND mode using pymavlink.
+    """
+    # Get the mode ID for LAND mode
+    mode_id = connection.mode_mapping().get("LAND")
+    
+    if mode_id is None:
+        print("LAND mode not available")
+        return
+
+    # Send the command to set the mode to LAND
+    connection.mav.command_long_send(
+        connection.target_system,
+        connection.target_component,
+        mavutil.mavlink.MAV_CMD_DO_SET_MODE,
+        0,
+        mavutil.mavlink.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED,  # Enable custom mode
+        mode_id,  # Set to LAND mode ID
+        0, 0, 0, 0, 0  # Unused parameters
+    )
+    print("LAND mode command sent")
+
+def precision_land_acc():
     # ArUco setup
     aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
     aruco_params = aruco.DetectorParameters()
@@ -118,7 +228,7 @@ def precision_land_velocity():
     #ERROR_THRESHOLD = float(input("Enter threshold error: "))
     #marker_track = float(input("WHich marker ID you want to track? "))
     DESCENT_VELOCITY = 0.5
-    ERROR_THRESHOLD = 0.01 # land within 1 cm of target
+    ERROR_THRESHOLD = 0.02 # land within 1 cm of target
     marker_track = 0
 
     #x_res= 640 # pixels
@@ -145,17 +255,10 @@ def precision_land_velocity():
     
     i = 1
 
-    kp = 0.25
-    kd = 0.05
+    kp = 0.65 #considering critical to be 1.5
+    kd = 0.07  #0.07 was default
     ki = 0.0
 
-    # PID Controllers with optimized values
-    pid_x = PID(0.5, 0.0, 0.01, setpoint=0.0)
-    pid_y = PID(0.5, 0.0, 0.01, setpoint=0.0)
-    pid_x.sample_time = 0.01 
-    pid_y.sample_time = 0.01 
-    pid_x.output_limits = (-1, 1)
-    pid_y.output_limits = (-1, 1) 
 
     start_time = time.time()
     previous_time = 0
@@ -169,7 +272,7 @@ def precision_land_velocity():
     try:
 
         while True:
-            time.sleep(0.0167)
+            time.sleep(0.02)
             # receive header
             header = s.recv(header_size)
             if len(header) != header_size:
@@ -260,7 +363,7 @@ def precision_land_velocity():
                             derivative_x = (error_x - previous_error_x)/dt
                             derivative_y = (error_y - previous_error_y)/dt
                             error_sum_x += error_x*dt
-                            error_sum_y += error_y*dt  
+                            error_sum_y += error_y*dt
 
                         d_out_x = kd*derivative_x
                         d_out_y = kd*derivative_y
@@ -272,16 +375,9 @@ def precision_land_velocity():
                         previous_error_x = error_x
                         previous_error_y = error_y
 
-                        #v_x = p_out_x + d_out_x + i_out_x
-                        #v_y = p_out_y + d_out_y + i_out_y
+                        a_x = p_out_x + d_out_x + i_out_x
+                        a_y = p_out_y + d_out_y + i_out_y
 
-                        print(error_x)
-
-                        v_x = -pid_x(error_x)
-                        v_y = -pid_y(error_y)
-                        p, i, d = pid_x.components
-                        print(p, i, d)
-                        print (f"v_x: {v_x} v_y: {v_y}")
 
                         #ax = 0.01 + kp*(e_y) + kd*(e_y_t)
                         #ay = 0.01 + kp*(e_x) + kd*(e_x_t)
@@ -292,46 +388,45 @@ def precision_land_velocity():
                         #Sprint(f"e_x: {x_ang}, e_x_t: {e_x_t}")
                         
                         
-                        max_velocity = 20
-                        min_velocity = 0.0
+                        max_acc = 0.6
+                        min_acc = 0.0
 
-                        v_x = v_x if abs(error_x) > ERROR_THRESHOLD else 0
-                        v_y = v_y if abs(error_y) > ERROR_THRESHOLD else 0
+                        a_x = a_x if abs(error_x) > ERROR_THRESHOLD else 0
+                        a_y = a_y if abs(error_y) > ERROR_THRESHOLD else 0
 
                         def clamp(value):
                             if value > 0:
-                                return max(min_velocity, min(value, max_velocity))
+                                return max(min_acc, min(value, max_acc))
                             elif value < 0:
-                                return min(-min_velocity, max(value, -max_velocity))
+                                return min(-min_acc, max(value, -max_acc))
                             return 0  # Ensures zero remains zero
 
-                        v_x, v_y = clamp(v_x), clamp(v_y)
+                        a_x, a_y = clamp(a_x), clamp(a_y)
 
                         if ar_alt<100:
-                            DESCENT_VELOCITY = 0.15
+                            DESCENT_VELOCITY = 0.2
                         else:
                             DESCENT_VELOCITY = 0.5
 
-                        send_velocity(v_x,v_y, DESCENT_VELOCITY)
-                        print (f"v_x: {v_x} v_y: {v_y} v_z: {DESCENT_VELOCITY}")
-                        print("")
+                        send_acceleration(a_x,a_y, DESCENT_VELOCITY)
+                        print (f"a_x: {a_x} a_y: {a_y}")
+                        print("")        
                         
                         #yaw value of 0 is given to align the drone to true north
-                    
+
                     if markerID not in marker_positions:
                         marker_positions[markerID] = []
-                    marker_positions[markerID].append([x, y, z, v_x, v_y, DESCENT_VELOCITY])   
+                    marker_positions[markerID].append([x, y, z, a_x, a_y, DESCENT_VELOCITY])   
+
                     
                     # Draw marker ID and position
                     cv2.putText(frame, str(markerID), (topLeft[0], topLeft[1] - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
                     cv2.putText(frame, marker_position, (10, 50 + 20 * markerID), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (102, 0, 255), 2)
-
-                    
                     
             else:
                 print("aruco not detected")
                 print("continuing descent")       
-                send_velocity(0, 0, 0.2)
+                send_acceleration(0, 0, 0.2)
 
                 
             # Display the frame
@@ -340,9 +435,8 @@ def precision_land_velocity():
             # Break the loop when 'q' is pressed
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
-
             if (time.time() - start_time)>100:
-                print("time_over")
+                print("Time_over")
                 break
 
     except KeyboardInterrupt:
@@ -357,7 +451,9 @@ def precision_land_velocity():
     cv2.destroyAllWindows()
 
 # Example usage
-#run precision land
-precision_land_velocity()
+#detect_aruco_tags()
+connection_mode = get_flight_mode()
+print(connection_mode)
+precision_land_acc()
 #arm_disarm_drone(0)
 #send_velocity(0, 0.5, 0)
