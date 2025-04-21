@@ -6,7 +6,7 @@ import time
 import json
 
 HOST = '0.0.0.0'  # Listen on all available network interfaces
-PORTS = [14550, 14560]
+PORTS = [14551]
 SERVER_PORT = 6542
 COMM_PORT = 6553
 

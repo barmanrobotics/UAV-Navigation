@@ -117,4 +117,4 @@ if __name__ == '__main__':
     gps_thread.start()
     
     # Start the web server with debug mode off
-    socketio.run(app, host='0.0.0.0', port=5000, debug=False)
+    socketio.run(app, host='0.0.0.0', port=5001, debug=False)

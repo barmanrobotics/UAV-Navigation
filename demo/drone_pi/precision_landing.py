@@ -1,35 +1,13 @@
 # precision_landing.py
-import cv2
-import cv2.aruco as aruco
-import numpy as np
+import cv2 #type: ignore 
+import cv2.aruco as aruco #type: ignore 
+import numpy as np #type: ignore 
 import time
 import math
-from pymavlink import mavutil
+from pymavlink import mavutil #type: ignore 
 import os
 import csv
 
-try:
-    from picamera2 import Picamera2
-
-    x_res= 640 # pixels  #A resolution of 1014 x 760 works well and gives the same 30fps output
-    y_res = 480# pixels
-    FPS = 120
-
-    picam2 = Picamera2()
-    camera_config = picam2.create_preview_configuration(
-        raw={"size": (1536, 864)},
-        main={"format": 'RGB888', "size": (x_res,y_res)},
-        controls={"FrameRate": FPS}
-    )
-    # Apply the configuration to the camera
-    picam2.configure(camera_config)
-    picam2.start()
-    #picam2.set_controls({"AfMode": controls.AfModeEnum.Continuous}) #comment this out if you don't want autofocus
-    print("Waiting for camera to start")
-    time.sleep(1)
-    print("Camera Started")
-except:
-    print("Camera failed to initialize.")
 
 
 connection = None
@@ -58,7 +36,7 @@ def save_marker_positions(marker_positions):
             writer.writerows(positions)
         print(f"Saved positions for marker {marker_id} in {file_name}")
 
-def set_message_interval(rate_hz,code):
+def set_message_interval(connection, rate_hz, code):
     """
     Sets the update rate for a specific MAVLink message using MAV_CMD_SET_MESSAGE_INTERVAL.
 
@@ -82,7 +60,7 @@ def set_message_interval(rate_hz,code):
         0, 0, 0, 0, 0
     )
 
-def get_drone_attitude():
+def get_drone_attitude(connection):
     """
     Connects to the drone via MAVLink and retrieves attitude (roll, pitch, yaw).
     
@@ -99,10 +77,10 @@ def get_drone_attitude():
         return roll, pitch, yaw
     return None
 
-def takeoff(altitude):
+def takeoff(connection, altitude):
     message_rate = 50
     code = 33
-    set_message_interval(message_rate,code)
+    set_message_interval(connection, message_rate, code)
     print(f"Taking off to {altitude} meters...")
     connection.mav.command_long_send(
         connection.target_system,
@@ -119,7 +97,7 @@ def takeoff(altitude):
             print("Reached target altitude")
             break     
 
-def arm_disarm_drone(value):                      #set value to 1 to arm, 0 to disarm
+def arm_disarm_drone(connection, value):                      #set value to 1 to arm, 0 to disarm
     connection.mav.command_long_send(
         connection.target_system,
         connection.target_component,
@@ -141,32 +119,31 @@ def arm_disarm_drone(value):                      #set value to 1 to arm, 0 to d
         print(msg)
     # Wait until armed
 
-def get_yaw(master):
+def get_yaw(connection):
     """
     Get the yaw angle of a quadcopter using MAVLink.
     
-    :param master: MAVLink connection object
+    :param connection: MAVLink connection object
     :return: Yaw angle in degrees
     """
     message_rate = 50
     code = 30
-    set_message_interval(message_rate,code)
+    set_message_interval(connection, message_rate, code)
     time.sleep(1)
     while True:
         # Receive attitude message
-        msg = master.recv_match(type='ATTITUDE', blocking=True)
+        msg = connection.recv_match(type='ATTITUDE', blocking=True)
         if msg:
             yaw = msg.yaw * (180 / 3.141592653589793)  # Convert radians to degrees
             return yaw
 
-def send_yaw_command(master, target_yaw, yaw_speed, relative):
+def send_yaw_command(connection, target_yaw, yaw_speed, relative):
     """
     Sends a MAV_CMD_CONDITION_YAW command to control the drone's yaw.
 
-    :param master: MAVLink connection object
+    :param connection: MAVLink connection object
     :param target_yaw: Desired yaw angle (degrees)
     :param yaw_speed: Yaw rotation speed (degrees/sec)
-    :param direction: 1 for clockwise, -1 for counterclockwise
     :param relative: 1 for relative yaw, 0 for absolute yaw
     """
 
@@ -175,9 +152,9 @@ def send_yaw_command(master, target_yaw, yaw_speed, relative):
         direction = 1
     else:
         direction = 0
-    master.mav.command_long_send(
-        master.target_system,    # Target system ID
-        master.target_component, # Target component ID
+    connection.mav.command_long_send(
+        connection.target_system,    # Target system ID
+        connection.target_component, # Target component ID
         mavutil.mavlink.MAV_CMD_CONDITION_YAW, # Command ID
         0,  # Confirmation
         target_yaw,  # Target yaw angle in degrees
@@ -186,7 +163,7 @@ def send_yaw_command(master, target_yaw, yaw_speed, relative):
         relative,    # Relative (1) or absolute (0)
         0, 0, 0)     # Unused parameters
     
-def set_flight_mode(mode):
+def set_flight_mode(connection, mode):
     """
     Change the flight mode of the vehicle.
     
@@ -222,7 +199,7 @@ def set_flight_mode(mode):
         time.sleep(1)
    
 
-def get_flight_mode():
+def get_flight_mode(connection):
     # Request the vehicle's heartbeat
     msg = connection.recv_match(type='HEARTBEAT', blocking=True)
     if msg:
@@ -235,7 +212,7 @@ def get_flight_mode():
         return None
     
 
-def send_land_message_v2(x_rad=0, y_rad=0, dist_m=0, x_m=0,y_m=0,z_m=0, time_usec=0, target_num=0):
+def send_land_message_v2(connection, x_rad=0, y_rad=0, dist_m=0, x_m=0, y_m=0, z_m=0, time_usec=0, target_num=0):
         connection.mav.landing_target_send(
         time_usec,          # time target data was processed, as close to sensor capture as possible
         target_num,          # target num, not used
@@ -254,15 +231,34 @@ def send_land_message_v2(x_rad=0, y_rad=0, dist_m=0, x_m=0,y_m=0,z_m=0, time_use
     )
 
 
-def precision_land_mode():
+def precision_land_mode(connection):
 
-    message_rate = 50
-    code = 30
-    set_message_interval(message_rate,code)
-    time.sleep(1)
-    attitude = get_drone_attitude()
+    try:
+        from picamera2 import Picamera2 #type: ignore 
 
-    send_yaw_command(connection, 0,120,0)
+        x_res= 640 
+        y_res = 480
+        FPS = 120
+
+        picam2 = Picamera2()
+        camera_config = picam2.create_preview_configuration(
+            raw={"size": (1536, 864)},
+            main={"format": 'RGB888', "size": (x_res,y_res)},
+            controls={"FrameRate": FPS}
+        )
+        # Apply the configuration to the camera
+        picam2.configure(camera_config)
+        picam2.start()
+        #picam2.set_controls({"AfMode": controls.AfModeEnum.Continuous}) #comment this out if you don't want autofocus
+        print("Waiting for camera to start")
+        time.sleep(1)
+        print("Camera Started")
+    except:
+        print("Camera failed to initialize.")
+
+    attitude = get_drone_attitude(connection)
+
+    send_yaw_command(connection, 0, 120, 0)
     time.sleep(7)
 
     # ArUco setup
@@ -290,9 +286,9 @@ def precision_land_mode():
 
     #Changes the mode to land if mode is not land
 
-    mode = get_flight_mode()
+    mode = get_flight_mode(connection)
     if mode != 'LAND':
-        set_flight_mode('LAND')
+        set_flight_mode(connection, 'LAND')
         print ('mode set to LAND')
     
 
@@ -300,7 +296,7 @@ def precision_land_mode():
 
         while True:
 
-            attitude = get_drone_attitude()
+            attitude = get_drone_attitude(connection)
             img = picam2.capture_array()
     
             img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -348,7 +344,7 @@ def precision_land_mode():
                     #send_land_message_v2(x_rad= angle_y, y_rad= -angle_x, dist_m=z*0.01)
                     #send_land_message_v2(x_m=(x+offset_x)*0.01, y_m=(y+offset_y)*0.01, z_m=z*0.01, dist_m=z*0.01)
                 
-                    send_land_message_v2(x_m=(cor_x)*0.01, y_m=(cor_y)*0.01, z_m=cor_z*0.01, dist_m=cor_z*0.01)
+                    send_land_message_v2(connection, x_rad=0, y_rad=0, x_m=(cor_x)*0.01, y_m=(cor_y)*0.01, z_m=cor_z*0.01, dist_m=cor_z*0.01)
 
                     #saves the error values to debug later
                     if markerID not in marker_positions:

@@ -1,5 +1,5 @@
 // Initialize the map
-const map = L.map('map').setView([-35.3632, 149.1652], 17);
+const map = L.map('map').setView([39.326928, -76.621334], 17);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap contributors'
 }).addTo(map);
@@ -105,7 +105,7 @@ function updateMap(data) {
             towerMarkers[id].setLatLng(position);
         } else {
             const towerIcon = L.divIcon({
-                html: `<div class="tower-icon" style="font-size: 30px;">🗼</div>`,
+                html: `<div class="tower-icon" style="font-size: 30px;"></div>`,
                 className: 'tower-marker',
                 iconSize: [30, 30],
                 iconAnchor: [15, 15],

@@ -6,20 +6,45 @@ import sys
 import math
 
 # Client Configuration
-HUB_IP = 'localhost'
-if len(sys.argv) < 2:
-    print("Usage: python3 node_pi_client.py <PORT>")
-    sys.exit(1)
+HUB_IP = '10.203.121.89'
 
-PORT = int(sys.argv[1])
+PORT = 14551
 
 # MAVLink Connection to PX4
-connection = mavutil.mavlink_connection(f'udpin:localhost:{PORT}')
+connection = mavutil.mavlink_connection(f'127.0.0.1:{PORT}')
 connection.wait_heartbeat()
 
 current_command = None  # Track ongoing command
 
 home_gps = {"lat": 0, "lon": 0, "alt": 0}
+
+def set_message_interval(rate_hz,code):
+    """
+    Sets the update rate for a specific MAVLink message using MAV_CMD_SET_MESSAGE_INTERVAL.
+
+    :param connection: MAVLink connection object
+    :param message_id: MAVLink message ID (e.g., 30 for ATTITUDE)
+    :param rate_hz: Desired frequency in Hz
+    """
+
+    # Note that this would not work out of the box. You need to set the SERIALX
+    # options bitmask in the drone or SITL to ignore
+    # streamrate or else it will keep defaulting back to 4 Hz
+
+    interval_us = int(1e6 / rate_hz)  # Convert Hz to microseconds
+    connection.mav.command_long_send(
+        connection.target_system,
+        connection.target_component,
+        mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL,
+        0,  # Confirmation
+        code,
+        interval_us,
+        0, 0, 0, 0, 0
+    )
+    
+set_message_interval(50, 33)
+set_message_interval(50, 30)
+
 
 def send_gps_coordinates(client):
     while True:
@@ -247,6 +272,7 @@ def main():
     try:
         client.connect((HUB_IP, PORT))
         print(f"Connected to server at {HUB_IP}:{PORT}")
+
         
         # Start receiving messages in a separate thread
         receive_thread = threading.Thread(target=receive_messages, args=(client,))
