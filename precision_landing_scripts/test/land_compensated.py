@@ -295,6 +295,8 @@ def precision_land_mode():
     set_message_interval(message_rate,code)
     time.sleep(1)
     attitude = get_drone_attitude()
+    send_yaw_command(connection, 0,120,0)
+    time.sleep(7)
 
     # ArUco setup
     aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)

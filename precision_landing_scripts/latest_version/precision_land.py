@@ -1,3 +1,6 @@
+"Author: Arnab Chatterjee"
+"Version: 0.1"
+
 import csv
 import os
 import cv2
@@ -154,6 +157,33 @@ def get_yaw(master):
         if msg:
             yaw = msg.yaw * (180 / 3.141592653589793)  # Convert radians to degrees
             return yaw
+
+def send_yaw_command(master, target_yaw, yaw_speed, relative):
+    """
+    Sends a MAV_CMD_CONDITION_YAW command to control the drone's yaw.
+
+    :param master: MAVLink connection object
+    :param target_yaw: Desired yaw angle (degrees)
+    :param yaw_speed: Yaw rotation speed (degrees/sec)
+    :param direction: 1 for clockwise, -1 for counterclockwise
+    :param relative: 1 for relative yaw, 0 for absolute yaw
+    """
+
+    current_yaw = get_yaw(connection)
+    if current_yaw<0:
+        direction = 1
+    else:
+        direction = 0
+    master.mav.command_long_send(
+        master.target_system,    # Target system ID
+        master.target_component, # Target component ID
+        mavutil.mavlink.MAV_CMD_CONDITION_YAW, # Command ID
+        0,  # Confirmation
+        target_yaw,  # Target yaw angle in degrees
+        yaw_speed,   # Yaw speed in degrees/sec
+        direction,   # Direction: 1 = CW, -1 = CCW
+        relative,    # Relative (1) or absolute (0)
+        0, 0, 0)     # Unused parameters
     
 def set_flight_mode(mode):
     """
@@ -230,6 +260,9 @@ def precision_land_mode():
     set_message_interval(message_rate,code)
     time.sleep(1)
     attitude = get_drone_attitude()
+
+    send_yaw_command(connection, 0,120,0)
+    time.sleep(7)
 
     # ArUco setup
     aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
