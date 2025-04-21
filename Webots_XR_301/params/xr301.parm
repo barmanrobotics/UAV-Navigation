@@ -27,6 +27,7 @@ INS_POS2_X       0.1
 INS_POS3_X       0.1
 
 PLND_ENABLED     1
+PLND_TYPE        1
 
 LAND_SPEED       30
 
