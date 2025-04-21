@@ -5,7 +5,6 @@ import numpy as np
 import time
 import math
 from pymavlink import mavutil
-import struct
 import os
 import csv
 
@@ -35,6 +34,11 @@ except:
 
 connection = None
 
+"Author: Arnab Chatterjee"
+"Version: 0.1"
+
+
+
 def get_unique_filename(base_name):
     #Stores the csv files with new names without overwriting
     counter = 1
@@ -50,11 +54,55 @@ def save_marker_positions(marker_positions):
         file_name = get_unique_filename(f"marker_{marker_id}")
         with open(file_name, mode='w', newline='') as file:
             writer = csv.writer(file)
-            writer.writerow(["X", "Y", "Z"])  # Write header
+            writer.writerow(["X", "X_compensated", "Y","Y_compensated", "Z", "Z_compensated"])  # Write header
             writer.writerows(positions)
         print(f"Saved positions for marker {marker_id} in {file_name}")
 
+def set_message_interval(rate_hz,code):
+    """
+    Sets the update rate for a specific MAVLink message using MAV_CMD_SET_MESSAGE_INTERVAL.
+
+    :param connection: MAVLink connection object
+    :param message_id: MAVLink message ID (e.g., 30 for ATTITUDE)
+    :param rate_hz: Desired frequency in Hz
+    """
+
+    # Note that this would not work out of the box. You need to set the SERIALX
+    # options bitmask in the drone or SITL to ignore
+    # streamrate or else it will keep defaulting back to 4 Hz
+
+    interval_us = int(1e6 / rate_hz)  # Convert Hz to microseconds
+    connection.mav.command_long_send(
+        connection.target_system,
+        connection.target_component,
+        mavutil.mavlink.MAV_CMD_SET_MESSAGE_INTERVAL,
+        0,  # Confirmation
+        code,
+        interval_us,
+        0, 0, 0, 0, 0
+    )
+
+def get_drone_attitude():
+    """
+    Connects to the drone via MAVLink and retrieves attitude (roll, pitch, yaw).
+    
+    :param connection_string: MAVLink connection string (e.g., 'udp:127.0.0.1:14550' or 'COM3' for serial)
+    :return: Tuple (roll_deg, pitch_deg, yaw_deg) in degrees
+    """
+    # Wait for an ATTITUDE message
+    msg = connection.recv_match(type='ATTITUDE', blocking=True)
+    if msg:
+        roll = msg.roll # Convert radians to degrees
+        pitch = msg.pitch
+        yaw = msg.yaw
+
+        return roll, pitch, yaw
+    return None
+
 def takeoff(altitude):
+    message_rate = 50
+    code = 33
+    set_message_interval(message_rate,code)
     print(f"Taking off to {altitude} meters...")
     connection.mav.command_long_send(
         connection.target_system,
@@ -69,8 +117,7 @@ def takeoff(altitude):
         print(f"Current altitude: {current_alt:.2f} meters")
         if current_alt >= altitude * 0.95:  # Reached 95% of target altitude
             print("Reached target altitude")
-            break
-        time.sleep(0.5)        
+            break     
 
 def arm_disarm_drone(value):                      #set value to 1 to arm, 0 to disarm
     connection.mav.command_long_send(
@@ -101,6 +148,10 @@ def get_yaw(master):
     :param master: MAVLink connection object
     :return: Yaw angle in degrees
     """
+    message_rate = 50
+    code = 30
+    set_message_interval(message_rate,code)
+    time.sleep(1)
     while True:
         # Receive attitude message
         msg = master.recv_match(type='ATTITUDE', blocking=True)
@@ -108,8 +159,7 @@ def get_yaw(master):
             yaw = msg.yaw * (180 / 3.141592653589793)  # Convert radians to degrees
             return yaw
 
-
-def send_yaw_command(master, target_yaw, yaw_speed, direction, relative):
+def send_yaw_command(master, target_yaw, yaw_speed, relative):
     """
     Sends a MAV_CMD_CONDITION_YAW command to control the drone's yaw.
 
@@ -119,6 +169,12 @@ def send_yaw_command(master, target_yaw, yaw_speed, direction, relative):
     :param direction: 1 for clockwise, -1 for counterclockwise
     :param relative: 1 for relative yaw, 0 for absolute yaw
     """
+
+    current_yaw = get_yaw(connection)
+    if current_yaw<0:
+        direction = 1
+    else:
+        direction = 0
     master.mav.command_long_send(
         master.target_system,    # Target system ID
         master.target_component, # Target component ID
@@ -129,46 +185,6 @@ def send_yaw_command(master, target_yaw, yaw_speed, direction, relative):
         direction,   # Direction: 1 = CW, -1 = CCW
         relative,    # Relative (1) or absolute (0)
         0, 0, 0)     # Unused parameters
-
-def send_velocity(vx,vy,vz):
-    # Send velocity command in the drone's NED frame
-    connection.mav.set_position_target_local_ned_send(
-        0,       # time_boot_ms (not used)
-        0, 0,    # target_system, target_component
-        mavutil.mavlink.MAV_FRAME_BODY_NED,  # Frame of reference (Body frame)
-        0b100111000111,  # Control velocity only
-        0, 0, 0,  # Position x, y, z (not used)
-        vx, vy, vz,  # Velocity x, y, z (used)
-        0, 0, 0,  # Acceleration (not used)
-        0.75, 0  # yaw, yaw_rate (not used)
-    )
-
-def send_velocity_yaw(yaw,vx,vy,vz):
-    # Send velocity command in the drone's NED frame
-    connection.mav.set_position_target_local_ned_send(
-        0,       # time_boot_ms (not used)
-        0, 0,    # target_system, target_component
-        1,  # Frame of reference (Body frame)
-        mavutil.mavlink.MAV_FRAME_LOCAL_NED,  # Control velocity only
-        0, 0, 0,  # Position x, y, z (not used)
-        vx, vy, vz,  # Velocity x, y, z
-        0, 0, 0,  # Acceleration (not used)
-        yaw, 0  # yaw, yaw_rate (not used)
-        )
-    print('setting yaw')
-
-def send_acceleration(ax, ay, vz):
-    # Send velocity command in the drone's NED frame
-    connection.mav.set_position_target_local_ned_send(
-        0,       # time_boot_ms (not used)
-        0, 0,    # target_system, target_component
-        mavutil.mavlink.MAV_FRAME_BODY_OFFSET_NED,  # Frame of reference (Body frame)
-        0b110000000000,  # Control velocity only
-        0, 0, 0,  # Position x, y, z (not used)
-        0, 0, vz,  # Velocity x, y, z
-        ax, ay, 0,  # Acceleration (not used)
-        0, 0  # yaw, yaw_rate (not used)
-    )
     
 def set_flight_mode(mode):
     """
@@ -218,40 +234,6 @@ def get_flight_mode():
         print("Failed to receive flight mode.")
         return None
     
-def set_land_mode():
-    """
-    Function to set the vehicle to LAND mode using pymavlink.
-    """
-    # Get the mode ID for LAND mode
-    mode_id = connection.mode_mapping().get("LAND")
-    
-    if mode_id is None:
-        print("LAND mode not available")
-        return
-
-    # Send the command to set the mode to LAND
-    connection.mav.command_long_send(
-        connection.target_system,
-        connection.target_component,
-        mavutil.mavlink.MAV_CMD_DO_SET_MODE,
-        0,
-        mavutil.mavlink.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED,  # Enable custom mode
-        mode_id,  # Set to LAND mode ID
-        0, 0, 0, 0, 0  # Unused parameters
-    )
-    print("LAND mode command sent")
-
-def send_land_message_v1(x_rad=0.8, y_rad=0, dist_m=0.2, time_usec=0, target_num=0):
-        connection.mav.landing_target_send(
-        time_usec,          # time target data was processed, as close to sensor capture as possible
-        target_num,          # target num, not used
-        mavutil.mavlink.MAV_FRAME_BODY_NED, # frame, not used
-        x_rad,          # X-axis angular offset, in radians
-        y_rad,          # Y-axis angular offset, in radians
-        dist_m,          # distance, in meters
-        0,          # Target x-axis size, in radians
-        0,          # Target y-axis size, in radians
-    )
 
 def send_land_message_v2(x_rad=0, y_rad=0, dist_m=0, x_m=0,y_m=0,z_m=0, time_usec=0, target_num=0):
         connection.mav.landing_target_send(
@@ -272,48 +254,41 @@ def send_land_message_v2(x_rad=0, y_rad=0, dist_m=0, x_m=0,y_m=0,z_m=0, time_use
     )
 
 
-def precision_land_mode(conn):
-    global connection
-    connection = conn
+def precision_land_mode():
+
+    message_rate = 50
+    code = 30
+    set_message_interval(message_rate,code)
+    time.sleep(1)
+    attitude = get_drone_attitude()
+
+    send_yaw_command(connection, 0,120,0)
+    time.sleep(7)
+
     # ArUco setup
     aruco_dict = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
     aruco_params = aruco.DetectorParameters()
     marker_positions = {}
 
     #distance from the center of the tag along x or y axes where you'd like the center of the camera to land
-    #if you want the center of the camera to land at the center of the tag, set it to 0.
+    #if you want the center of the camera to land at the center of the tag, set offsets to 0.
 
-    #marker_size = float(input("Please enter the marker size in cm: "))
     #offset_x = float(input("Please enter the x offset distance in cm. Back is positive: "))
     #offset_y = float(input("Please enter the y offset distance in cm. Right is positive: "))
     marker_size = 19.2
-    offset_x = 0
-    offset_y = 0
-    #DESCENT_VELOCITY = float(input("Enter initial descent velocity: ")) 
-    #ERROR_THRESHOLD = float(input("Enter threshold error: "))
-    #marker_track = float(input("WHich marker ID you want to track? "))
-    marker_track = 0
+    offset_x = -3.6 # Enter the x offset distance in cm. a positive value will make the camera land infornt of the tag and vice versa:
+    offset_y = 0    # Enter the y offset distance in cm. a positive value will make the camera land right of the tag and vice versa:
+    threshold = 1 #cm if error is within this, don't correct the quadcopter
 
-    #x_res= 640 # pixels
-    #y_res = 480 # pixels
+    cam_dist = 14.754 #Distance of camera from cg in x axes
 
-    camera_matrix = np.array([
-    [917.1777059, 0.00000000, 323.46713801],
-    [0.00000000, 926.27018107, 240.68578702],
-    [0.00000000, 0.00000000, 1.00000000]
-    ])
+    camera_matrix = np.array([[570.41873064,0.0,285.59706468],
+    [   0.0,564.78457011,225.93404959],
+    [  0.0,0.0,1.0]])
 
-    dist_coefficients= np.array([
-    [-4.21053311e-01],
-    [6.10894559e+00],
-    [1.08524770e-03],
-    [-3.40935112e-02],
-    [-6.30249662e+01]
-    ])
+    dist_coefficients = np.array([[ 0.10980456], [-0.32288555], [-0.00354651], [-0.02758834], [-1.85357048]])
 
-    header_size = struct.calcsize("=HH")
-
-    q = [1,0,0,0]
+    #Changes the mode to land if mode is not land
 
     mode = get_flight_mode()
     if mode != 'LAND':
@@ -322,8 +297,10 @@ def precision_land_mode(conn):
     
 
     try:
-            time.sleep(0.02)
-            # receive header
+
+        while True:
+
+            attitude = get_drone_attitude()
             img = picam2.capture_array()
     
             img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -331,12 +308,9 @@ def precision_land_mode(conn):
 
             # Detect the markers in the frame
             corners, ids, rejected = aruco.detectMarkers(frame, aruco_dict, parameters=aruco_params)
-            aruco.drawDetectedMarkers(frame, corners)
             corners = np.array(corners)
-            # Draw detected markers on the frame
-            #ids = ids.flatten
             np_id  = np.array(ids)
-            found = np.isin(0, np_id)
+            found = np.isin(0, np_id) #if marker 0 and only one marker is detected then proceed
             if found == True and len(corners)==1:
                 ids = ids.flatten()
                 aruco.drawDetectedMarkers(frame, corners, ids=None, borderColor=(0, 255, 0))
@@ -345,47 +319,53 @@ def precision_land_mode(conn):
                     ret = aruco.estimatePoseSingleMarkers(markerCorner, marker_size, camera_matrix, dist_coefficients)
                     (rvec, tvec) = (ret[0][0,0,:], ret[1][0,0,:])
                     x, y, z = -tvec[1], tvec[0], tvec[2]
+                    roll = attitude[0]
+                    pitch = attitude[1]
 
-                    angle_x = math.atan2(x,z)
-                    angle_y = math.atan2(y,z)
+                    x_error_1 = z*math.tan(pitch) # When pitch is positive (i.e nose up), error is positive and added to the aruco x co-ordinate
+                                             # When pitch is negative (i.e nose down), error is removed from the aruco x co-ordinate
+                    y_error_1 = z*math.tan(-roll)  # Roll right is postive, the error should be removed from the y-co-ordinates as roll right increases the y co-ordinate
 
+                    x_error_2 = cam_dist*(1-math.cos(pitch))
+
+                    if pitch<0:
+                        x_error_2 = -x_error_2 
+
+                    x_compensated = x + x_error_1 + x_error_2
+                    y_compensated = y + y_error_1
+                    z_compensated = z - cam_dist*math.sin(pitch)
+
+                    cor_x = x_compensated + offset_x
+                    cor_y = y_compensated + offset_y
+                    cor_z = z_compensated
+
+                    #if the x and y errors are within threshold, do not move the drone
+                    if abs(x_compensated + offset_x)<threshold:
+                        cor_x = 0
+                    if abs(y_compensated + offset_y)<threshold:
+                        cor_y = 0
+                    
                     #send_land_message_v2(x_rad= angle_y, y_rad= -angle_x, dist_m=z*0.01)
-                    send_land_message_v2(x_m=(x-3.00)*0.01, y_m=y*0.01, z_m=z*0.01, dist_m=z*0.01)
+                    #send_land_message_v2(x_m=(x+offset_x)*0.01, y_m=(y+offset_y)*0.01, z_m=z*0.01, dist_m=z*0.01)
+                
+                    send_land_message_v2(x_m=(cor_x)*0.01, y_m=(cor_y)*0.01, z_m=cor_z*0.01, dist_m=cor_z*0.01)
 
+                    #saves the error values to debug later
                     if markerID not in marker_positions:
                         marker_positions[markerID] = []
-                    marker_positions[markerID].append([x, y, z])
+                    marker_positions[markerID].append([x, x_compensated, y, y_compensated, z, z_compensated])
 
-                    print (x,y,z)
+                    #print ("X is: ", x, "X compensated is:", x_compensated, "Pitch is:", pitch, " radians")
+                    #print ("Y is: ", y, "Y compensated is:", y_compensated, "Roll is:", roll, " radians")
+                    #print ("Z is: ", z, "Z compensated is:", z_compensated, "Pitch is:", pitch, " radians")
 
-                    #send_land_message_v1()
-                    #send_land_message_v2(dist_m=z*0.01, x_m= x*0.01,y_m=y*0.01,z_m=z*0.01)
-                    
-
-                    marker_position = f'MARKER {markerID}: x={x:.2f} y={y:.2f} z={z:.2f}'
-
-                    # extract the marker corners (which are always returned in
-                    # top-left, top-right, bottom-right, and bottom-left order)
-                
-                    corners = markerCorner.reshape((4, 2))
-                    (topLeft, topRight, bottomRight, bottomLeft) = corners
-                    # convert each of the (x, y)-coordinate pairs to integers
-                    topRight = (int(topRight[0]), int(topRight[1]))
-                    bottomRight = (int(bottomRight[0]), int(bottomRight[1]))
-                    bottomLeft = (int(bottomLeft[0]), int(bottomLeft[1]))
-                    topLeft = (int(topLeft[0]), int(topLeft[1]))
-
-                    # compute and draw the center (x, y)-coordinates of the ArUco
-                    # marker
-                    cX = int((topLeft[0] + bottomRight[0]) / 2.0)
-                    cY = int((topLeft[1] + bottomRight[1]) / 2.0)
-                    
             else:
                 print("aruco not detected. Continuing normal descent")
                 print("")
-
+            
     except KeyboardInterrupt:
         print("\nKeyboardInterrupt detected. Saving data before exiting...")
     finally:
         # Save all marker positions once per execution
         save_marker_positions(marker_positions)
+
