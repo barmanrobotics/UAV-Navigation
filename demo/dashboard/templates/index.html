@@ -3,57 +3,207 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Drone Management Dashboard</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <title>UAV Navigation Dashboard</title>
+    
+    <!-- Include Leaflet CSS and JS (for maps) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    
+    <!-- Include Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    
+    <!-- Include Toastify for notifications -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js@1.12.0/src/toastify.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/toastify-js@1.12.0/src/toastify.min.js"></script>
+    
+    <!-- Socket.IO for real-time communication -->
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+    
+    <!-- Custom styles -->
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
     <div class="dashboard">
-        <header>
-            <h1>Drone Management System</h1>
-        </header>
-        
-        <div class="main-content">
-            <div id="map" style="height: 500px;"></div>
-            
-            <div class="control-panel">
-                <h2>Drone Status</h2>
-                <div id="drone-list"></div>
-                
-                <h2>Command Center</h2>
-                <div class="command-form">
-                    <select id="drone-select">
-                        <option value="">Select Drone</option>
-                    </select>
-                    
-                    <select id="command-select">
-                        <option value="">Select Command</option>
-                        <option value="TAKEOFF">Takeoff</option>
-                        <option value="WAYPOINT">Waypoint</option>
-                        <option value="RTH">Return to Home</option>
-                        <option value="STANDBY">Standby</option>
-                        <option value="LAND">Land</option>
-                        <option value="PRECISION_LAND">Precision Land</option>
-                    </select>
-                    
-                    <div id="takeoff-inputs" style="display: none;">
-                        <input type="number" id="takeoff-alt" placeholder="Takeoff Altitude (meters)">
-                    </div>
-                    
-                    <div id="waypoint-inputs" style="display: none;">
-                        <input type="number" id="wp-x" placeholder="X Offset">
-                        <input type="number" id="wp-y" placeholder="Y Offset">
-                        <input type="number" id="wp-z" placeholder="Z Offset">
-                    </div>
-                    
-                    <button id="send-command">Send Command</button>
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <i class="fas fa-drone"></i>
+                <span>UAV Navigation Dashboard</span>
+            </div>
+            <div class="system-info">
+                <div class="status-item">
+                    <span class="status-label">System:</span>
+                    <span id="system-status" class="status-value">Connecting...</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Connection:</span>
+                    <span id="connection-status" class="status-value">Disconnected</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Time:</span>
+                    <span id="current-time" class="status-value">00:00:00</span>
                 </div>
             </div>
-        </div>
+        </header>
+        
+        <!-- Main content area -->
+        <main class="content">
+            <!-- Map panel -->
+            <section class="panel map-panel">
+                <div class="panel-header">
+                    <h2><i class="fas fa-map-marker-alt"></i> Map View</h2>
+                    <div class="panel-actions">
+                        <button id="center-map" class="action-button">
+                            <i class="fas fa-crosshairs"></i>
+                        </button>
+                        <button id="toggle-satellite" class="action-button">
+                            <i class="fas fa-satellite"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="panel-content">
+                    <div id="map-container" class="map-container"></div>
+                    <div id="map-instructions" class="map-instructions hidden">
+                        <p>Click on the map to set waypoints when in waypoint mode</p>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Drone list panel -->
+            <section class="panel drone-panel">
+                <div class="panel-header">
+                    <h2><i class="fas fa-drone"></i> Drones</h2>
+                    <div class="panel-actions">
+                        <button id="refresh-drones" class="action-button">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="panel-content">
+                    <div id="drone-list" class="drone-list">
+                        <!-- Drone items will be generated by JavaScript -->
+                        <div class="loading-placeholder">Loading drones...</div>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- Command panel -->
+            <section class="panel command-panel">
+                <div class="panel-header">
+                    <h2><i class="fas fa-terminal"></i> Command Center</h2>
+                </div>
+                <div class="panel-content">
+                    <form id="command-form" class="command-form disabled">
+                        <div class="form-row">
+                            <label for="command-select">Command:</label>
+                            <select id="command-select" required>
+                                <option value="">Select a command</option>
+                                <option value="takeoff">Takeoff</option>
+                                <option value="land">Land</option>
+                                <option value="waypoint">Waypoint Mission</option>
+                                <option value="mode">Change Mode</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Command-specific fields -->
+                        <div id="takeoff-fields" class="command-fields">
+                            <div class="form-row">
+                                <label for="takeoff-altitude">Altitude (m):</label>
+                                <input type="number" id="takeoff-altitude" min="1" max="120" value="10" step="1" required>
+                            </div>
+                        </div>
+                        
+                        <div id="waypoint-fields" class="command-fields">
+                            <div class="form-row">
+                                <button type="button" id="waypoint-mode-toggle" class="secondary-button">
+                                    Enter Waypoint Mode
+                                </button>
+                                <button type="button" id="clear-waypoints" class="secondary-button danger">
+                                    Clear Waypoints
+                                </button>
+                            </div>
+                            
+                            <!-- Manual NED coordinates input -->
+                            <div class="form-row">
+                                <label>Waypoint Coordinates (NED):</label>
+                                <div class="coordinate-inputs">
+                                    <div class="coord-input">
+                                        <label for="waypoint-x">X (North):</label>
+                                        <input type="number" id="waypoint-x" step="0.1" value="0" readonly>
+                                    </div>
+                                    <div class="coord-input">
+                                        <label for="waypoint-y">Y (East):</label>
+                                        <input type="number" id="waypoint-y" step="0.1" value="0" readonly>
+                                    </div>
+                                    <div class="coord-input">
+                                        <label for="waypoint-z">Z (Down):</label>
+                                        <input type="number" id="waypoint-z" step="0.1" value="0" readonly>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div id="mode-fields" class="command-fields">
+                            <div class="form-row">
+                                <label for="flight-mode">Flight Mode:</label>
+                                <select id="flight-mode" required>
+                                    <option value="GUIDED">Guided</option>
+                                    <option value="AUTO">Auto</option>
+                                    <option value="LOITER">Loiter</option>
+                                    <option value="RTL">Return to Launch</option>
+                                    <option value="STABILIZE">Stabilize</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row submit-row">
+                            <button type="submit" id="send-command" class="primary-button">
+                                <i class="fas fa-paper-plane"></i> Send Command
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+            
+            <!-- Notifications panel -->
+            <section class="panel notifications-panel">
+                <div class="panel-header">
+                    <h2><i class="fas fa-bell"></i> Notifications</h2>
+                    <div class="panel-actions">
+                        <button id="clear-notifications" class="action-button">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="panel-content">
+                    <div id="notifications-list" class="notifications-list">
+                        <!-- Notifications will be generated by JavaScript -->
+                    </div>
+                </div>
+            </section>
+        </main>
+        
+        <!-- Footer -->
+        <footer class="footer">
+            <div>UAV Navigation System v1.0</div>
+            <div>&copy; 2023 UAV Navigation Team</div>
+        </footer>
     </div>
     
-    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <!-- Custom JavaScript -->
+    <script src="/static/script.js"></script>
+    
+    <!-- For the demo, initialize with some data -->
+    <script>
+        // Update the current time
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('current-time').textContent = now.toLocaleTimeString();
+        }
+        
+        // Update the time immediately and then every second
+        updateTime();
+        setInterval(updateTime, 1000);
+    </script>
 </body>
 </html> 
