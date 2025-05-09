@@ -30,13 +30,13 @@ function initializeMap() {
     // Add the main tile layer (standard map)
     const standardLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        maxZoom: 19
-}).addTo(map);
+        maxZoom: 21
+    }).addTo(map);
 
     // Add satellite layer (not shown by default)
     const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
         attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
-        maxZoom: 19
+        maxZoom: 21
     });
     
     // Store layers for toggling
@@ -217,6 +217,11 @@ function setupEventListeners() {
             const instructions = document.getElementById('map-instructions');
             if (instructions) {
                 instructions.classList.toggle('hidden', !waypointMode);
+            }
+            
+            // Change map cursor
+            if (map) {
+                map.getContainer().style.cursor = waypointMode ? 'crosshair' : '';
             }
             
             // If entering waypoint mode and we have a selected drone but no waypoints,
@@ -499,9 +504,9 @@ function updateDroneMarker(droneId, drone) {
     // Create a custom icon for the drone
     const droneIcon = L.divIcon({
         className: 'drone-marker',
-        html: `<i class="fas fa-drone"></i>`,
-        iconSize: [24, 24],
-        iconAnchor: [12, 12]
+        html: `<div class="drone-heading-caret" style="transform: rotate(${drone.hdg ? drone.hdg : 0}deg);">^</div><i class=\"fas fa-drone\"></i>`,
+        iconSize: [16, 24], // 16x16 for drone, caret above
+        iconAnchor: [8, 16] // anchor at bottom of drone icon
     });
     
     // Update existing marker or create a new one
@@ -535,6 +540,20 @@ function updateDroneMarker(droneId, drone) {
             droneMarkers[droneId].getElement().classList.remove('selected');
         }
     }
+    
+    // Remove any previous vector code for heading
+    if (window.droneVectors && window.droneVectors[droneId]) {
+        map.removeLayer(window.droneVectors[droneId]);
+        delete window.droneVectors[droneId];
+    }
+    
+    // Add CSS for the caret in a <style> tag if not already present
+    if (!document.getElementById('drone-heading-caret-style')) {
+        const style = document.createElement('style');
+        style.id = 'drone-heading-caret-style';
+        style.innerHTML = `.drone-heading-caret { display: block; color: #e74c3c; font-size: 14px; font-weight: bold; line-height: 12px; text-align: center; margin-bottom: -2px; }`;
+        document.head.appendChild(style);
+    }
 }
 
 // Select a drone
@@ -566,6 +585,13 @@ function selectDrone(droneId) {
     const commandForm = document.getElementById('command-form');
     if (commandForm) {
         commandForm.classList.remove('disabled');
+        // Always enable NED fields
+        document.getElementById('waypoint-x').removeAttribute('readonly');
+        document.getElementById('waypoint-x').removeAttribute('disabled');
+        document.getElementById('waypoint-y').removeAttribute('readonly');
+        document.getElementById('waypoint-y').removeAttribute('disabled');
+        document.getElementById('waypoint-z').removeAttribute('readonly');
+        document.getElementById('waypoint-z').removeAttribute('disabled');
     } else {
         console.error("Command form not found when selecting drone");
     }
@@ -640,53 +666,57 @@ function addWaypoint(latlng) {
     // Update waypoint position when marker is dragged
     marker.on('dragend', function() {
         waypoints[0] = marker.getLatLng();
-        
-        // If a drone is selected, update the NED coordinates
+        // If a drone is selected, update the NED coordinates from backend
         if (selectedDrone && droneMarkers[selectedDrone]) {
-            updateNedCoordinates();
+            updateNedCoordinatesFromBackend();
         }
     });
     
     waypointMarkers.push(marker);
     
-    // If a drone is selected, calculate and display NED coordinates
+    // If a drone is selected, calculate and display NED coordinates from backend
     if (selectedDrone && droneMarkers[selectedDrone]) {
-        updateNedCoordinates();
+        updateNedCoordinatesFromBackend();
     }
     
     addNotification(`Waypoint added`, 'success');
 }
 
-// Calculate and update NED coordinates based on drone and waypoint positions
-function updateNedCoordinates() {
+// Calculate and update NED coordinates using the backend
+function updateNedCoordinatesFromBackend() {
     if (!selectedDrone || !droneMarkers[selectedDrone] || waypoints.length === 0) {
         return;
     }
-    
-    const dronePos = droneMarkers[selectedDrone].getLatLng();
     const waypointPos = waypoints[0];
-    
-    // Calculate distance between points (simple flat-earth approximation)
-    // These calculations are simplified and not accurate for long distances
-    const R = 6371000; // Earth's radius in meters
-    const lat1 = dronePos.lat * Math.PI / 180;
-    const lat2 = waypointPos.lat * Math.PI / 180;
-    const lon1 = dronePos.lng * Math.PI / 180;
-    const lon2 = waypointPos.lng * Math.PI / 180;
-    
-    // North distance (y)
-    const dy = (lat2 - lat1) * R;
-    
-    // East distance (x)
-    const dx = (lon2 - lon1) * R * Math.cos(lat1);
-    
-    // Assume 0 for Down as we can't determine altitude from map clicks
-    const dz = 0;
-    
-    // Update the input fields
-    document.getElementById('waypoint-x').value = dx.toFixed(1);
-    document.getElementById('waypoint-y').value = dy.toFixed(1);
-    document.getElementById('waypoint-z').value = dz.toFixed(1);
+    fetch('/api/waypoint', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            drone_id: selectedDrone,
+            target_lat: waypointPos.lat,
+            target_lon: waypointPos.lng
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && data.waypoint) {
+            // Only update if not focused
+            if (document.activeElement !== document.getElementById('waypoint-x')) {
+                document.getElementById('waypoint-x').value = data.waypoint.x;
+            }
+            if (document.activeElement !== document.getElementById('waypoint-y')) {
+                document.getElementById('waypoint-y').value = data.waypoint.y;
+            }
+            if (document.activeElement !== document.getElementById('waypoint-z')) {
+                document.getElementById('waypoint-z').value = data.waypoint.z;
+            }
+        } else {
+            addNotification('Failed to calculate NED coordinates', 'error');
+        }
+    })
+    .catch(() => {
+        addNotification('Error contacting backend for NED calculation', 'error');
+    });
 }
 
 // Clear all waypoints
@@ -781,6 +811,8 @@ function sendDroneCommand() {
                 
                 // Clear waypoints after sending
                 clearWaypoints();
+                // Prevent sending a duplicate generic command
+                return;
             } else {
                 // Use NED coordinates shown in the input fields
                 const x = document.getElementById('waypoint-x').value;
@@ -802,10 +834,11 @@ function sendDroneCommand() {
                 });
             }
             break;
-            
-        case 'mode':
-            const mode = document.getElementById('flight-mode').value;
-            commandData.command = `MODE ${mode}`;
+        case 'precision_land':
+            commandData.command = 'PRECISION_LAND';
+            break;
+        case 'standby':
+            commandData.command = 'STANDBY';
             break;
     }
     

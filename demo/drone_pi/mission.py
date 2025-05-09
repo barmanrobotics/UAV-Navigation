@@ -95,8 +95,9 @@ def set_message_interval(message_id, rate_hz, verify=True, timeout=3):
 message_rates = [
     (33, 50),  # GLOBAL_POSITION_INT at 50 Hz
     (30, 50),  # ATTITUDE at 50 Hz
-    (74, 20),  # VFR_HUD at 20 Hz
-    (24, 30),  # GPS_RAW_INT at 30 Hz
+    (74, 5),  # VFR_HUD at 20 Hz
+    (24, 5),  # GPS_RAW_INT at 30 Hz
+    (32, 10),  # LOCAL_POSITION_NED at 30 Hz
 ]
 
 print("Setting up message stream rates...")

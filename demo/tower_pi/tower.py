@@ -18,7 +18,7 @@ gps_logger = logging.getLogger('gps_data')
 gps_logger.setLevel(logging.WARNING)  # Set to WARNING to hide most GPS messages
 
 HOST = '0.0.0.0'  # Listen on all available network interfaces
-PORTS = [14551]
+PORTS = [14551, 14552]
 SERVER_PORT = 6542
 COMM_PORT = 6553
 
