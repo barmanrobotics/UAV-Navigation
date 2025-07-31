@@ -57,14 +57,13 @@ def arm_drone():
             connection.target_system,
             connection.target_component,
             mavutil.mavlink.MAV_CMD_COMPONENT_ARM_DISARM,
-            1,
-            1, 0, 0, 0, 0, 0, 0
+            1, 1, 0, 0, 0, 0, 0, 0
         )
         heartbeat = connection.recv_match(type='HEARTBEAT', blocking=True)
         if heartbeat.base_mode & mavutil.mavlink.MAV_MODE_FLAG_SAFETY_ARMED:
             print("Drone is armed")
             break
-        time.sleep(1)
+        time.sleep(2)
 
 # Take off to a specified altitude
 def takeoff(altitude):
@@ -79,7 +78,7 @@ def takeoff(altitude):
     while True:
         msg = connection.recv_match(type='GLOBAL_POSITION_INT', blocking=True)
         current_alt = msg.relative_alt / 1000.0
-        print(f"Current altitude: {current_alt:.2f} meters")
+        # print(f"Current altitude: {current_alt:.2f} meters")
         if current_alt >= altitude * 0.95:  # Reached 95% of target altitude
             print("Reached target altitude")
             break
@@ -129,8 +128,9 @@ def fly_relative_distance(distance, angle, alt):
         
         # Check if we have moved the desired distance
         distance_travelled = get_distance_meters(current_lat, current_lon, lat_takeoff, lon_takeoff)
+        print(f"Distance: {distance_travelled}", end="\r")
         if distance_travelled >= distance - 1:  # Check if we've moved the target distance
-            print("Target distance reached.")
+            print("\nTarget distance reached.")
             break
         
         # Timeout after 30 seconds in case the drone doesn't reach the target
@@ -138,8 +138,7 @@ def fly_relative_distance(distance, angle, alt):
             print("Timed out while trying to reach target distance.")
             break
 
-        print(f"Distance: {distance_travelled}")
-        time.sleep(1)
+        time.sleep(.5)
 
 
 # Function to calculate the distance between two GPS points (Haversine formula)
@@ -167,26 +166,24 @@ def get_location():
     
 # set yaw heading in degrees
 def set_yaw(yaw):
+    error = 0.2
     connection.mav.command_long_send(
         connection.target_system,
         connection.target_component,
         mavutil.mavlink.MAV_CMD_CONDITION_YAW,
-        yaw, 1, 15, 0, 0, 0, 0, 0
+        1, yaw, 10, 0, 0, 0, 0, 0
     )
-    # while True:
-    #     msg = connection.recv_match(type='GLOBAL_POSITION_INT', blocking=True)
-    #     if msg:
-    #         heading = msg.hdg
-    #         print(f"Current heading: {heading}")
-    #         if (yaw > 359 or yaw < 1):
-    #             if(heading < 1 or heading > 359):
-    #                 break
-    #         # continue when yaw is within one degree of accuracy
-    #         if (heading + 1 > yaw) and (heading - 1 < yaw):
-    #             break
-    #     time.sleep(.5)
-    time.sleep(10)
-    print("aligned, resuming")
+    yaw_rad = yaw/180*math.pi
+    print(yaw_rad)
+    while(True):
+        # msg = connection.recv_match(type='GLOBAL_POSITION_INT', blocking=True)
+        msg = connection.recv_match(type='ATTITUDE', blocking=True)
+        hdg = msg.yaw
+        print(f"Heading: {hdg}", end="\r")
+        if (hdg > yaw_rad - error) and (hdg < yaw_rad + error):
+            break
+        time.sleep(.5)
+    print("\naligned, resuming")
 
 
 def return_to_launch():
@@ -240,14 +237,20 @@ def yaw_return(lat, lon):
         current_lat = msg.lat / 1e7
         current_lon = msg.lon / 1e7
         dist = get_distance_meters(lat, lon, current_lat, current_lon)
+        print(f"Distance to takeoff: {dist}", end="\r")
         if(dist < 1):
             break
-    print("Takeoff location reached")
+        time.sleep(.5)
+    print("\nTakeoff location reached")
     set_yaw(180)
-    return_to_launch()
+    # return_to_launch()
+    print("Landing")
+    set_mode("LAND")
 
 # Store takeoff position
 lat_takeoff, lon_takeoff = None, None
+
+lat_box, lon_box = -35.3632571, 149.1652256
 
 # Execute the mission
 set_mode("GUIDED")
@@ -264,4 +267,5 @@ fly_relative_distance(target_distance, target_angle, target_alt)
 time.sleep(loiter_time)
 
 #return to launch and end mission
-yaw_return(lat_takeoff, lon_takeoff)
+yaw_return(lat_box, lon_box)
+# yaw_return(lat_takeoff, lon_takeoff)
