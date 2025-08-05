@@ -3,7 +3,7 @@
 
 # This is a script designed to mimic a complete flight.
 # It should take off, fly to a predetermined position, stabililze, lower in altitude,
-# then return back to the original gps location. 
+# then return back to land on the drone box module
 
 from pymavlink import mavutil # type: ignore
 import time
@@ -150,8 +150,6 @@ def get_distance_meters(lat1, lon1, lat2, lon2):
     a = math.sin(delta_phi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2) ** 2
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c
-
-
 
 def get_location():
     msg = connection.recv_match(type='GLOBAL_POSITION_INT', blocking=True)

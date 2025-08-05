@@ -8,10 +8,6 @@ import numpy as np
 import apriltag
 import socket
 import struct
-from pymavlink import mavutil # type: ignore
-import time
-import math
-import pymavlink.dialects.v20.all as dialect
 # from picamera2 import Picamera2
 # from libcamera import controls
 
@@ -20,28 +16,10 @@ y_res = 480 # pixels
 
 FPS = 120
 
-# Start a connection listening to a UDP port
-connection = mavutil.mavlink_connection('udpin:localhost:14550')
-
-# Wait for a heartbeat to confirm connection
-connection.wait_heartbeat()
-print("Connected to the vehicle")
-
 # connect to WebotsArduVehicle
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.connect(("127.0.0.1", 5599))
 print("Connected to socket")
-
-# set yaw heading in rad
-def set_yaw(yaw_rad):
-    yaw = yaw_rad/math.pi*180
-    # print(f"set yaw to {yaw}\n")
-    connection.mav.command_long_send(
-        connection.target_system,
-        connection.target_component,
-        mavutil.mavlink.MAV_CMD_CONDITION_YAW,
-        1, yaw, 10, 0, 0, 0, 0, 0
-    )
 
 ## Picam code
 
@@ -117,11 +95,7 @@ options = apriltag.DetectorOptions(families='tag36h11')  # default family
 detector = apriltag.Detector(options)
 header_size = struct.calcsize("=HH")
 
-start_time = time.time()
-yaw_timeout = 0 # sets a delay for the yaw command
-
 while True:
-    # print(yaw_timeout, end="\r")
 
     header = s.recv(header_size)
     if len(header) != header_size:
@@ -201,26 +175,14 @@ while True:
                 pt2 = tuple(det.corners[(i + 1) % 4].astype(int))
                 cv2.line(gray_color, pt1, pt2, (0, 255, 0), 2)
 
-
-            if (time.time() > yaw_timeout):
-                msg = connection.recv_match(type='ATTITUDE', blocking=True)
-                if(msg):
-                    curr_yaw = msg.yaw
-                    target_yaw = curr_yaw + rvec[2]
-                    yaw_timeout = time.time() + 5
-                    set_yaw(target_yaw)
-                    print(f"                           Desired yaw: {target_yaw}", end="\r")
-                    print(f"curr yaw: {curr_yaw}", end = "\r")
-
-
             
 
+    time.sleep(.1)
     
     # Display frame (optional – comment out if headless)
     cv2.imshow("AprilTag Pose", gray_color)
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
-
 
 # Cleanup
 cv2.destroyAllWindows()
