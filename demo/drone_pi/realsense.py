@@ -50,7 +50,7 @@ def dodge(vx,vy,vz,yaw):
         connection.target_system, 
         connection.target_component,
         mavutil.mavlink.MAV_FRAME_LOCAL_NED,  # NED frame
-        int(0b000111000111),  # type_mask to specify that we are setting velocity
+        int(0b110111000111),  # type_mask to specify that we are setting velocity
         0,            # North (meters)
         0,            # East (meters)
         0,            # Down (meters)
