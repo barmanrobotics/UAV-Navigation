@@ -1,6 +1,7 @@
-# Author : Arnab Chatterjee
-# First written : 06/20/2025
-# Recent Update date: 06/20/2025
+# Bill Wang
+
+# Modified code from Arnab Chatterjee
+
 
 import time
 import cv2

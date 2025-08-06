@@ -10,6 +10,8 @@ import numpy as np
 
 # Code from https://github.com/IntelRealSense/librealsense/blob/master/wrappers/python/examples/opencv_pointcloud_viewer.py
 
+# look into: https://github.com/thien94/vision_to_mavros/blob/master/scripts/d4xx_to_mavlink.py
+
 # Configure depth and color streams
 pipeline = rs.pipeline()
 config = rs.config()

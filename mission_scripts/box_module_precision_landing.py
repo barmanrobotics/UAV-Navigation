@@ -147,7 +147,6 @@ def april_tag_land(tag_size, use_display = True):
     timeout = 0 # sets a delay for the yaw command
 
     yaw_set = False
-    target_yaw = 0
     landed = False
     y_offset = .32 # account for april tag not aligned with box
     land_height = 2 # height to switch to landing mode
@@ -239,6 +238,13 @@ def april_tag_land(tag_size, use_display = True):
                         cv2.line(gray_color, pt1, pt2, (0, 255, 0), 2)
 
 
+                # Precision landing logic:
+                # Once the AprilTag is detected, start to align yaw and move xy to center while 
+                # descending so the tag so that it does not go out of frame while aligning the yaw. 
+                # After a certain altitude is reached, become more precise. Descend slower 
+                # and go for final alignment.
+                # Under a final altitude threshold (lowest the drone can safely go while 
+                # still having the whole tag visible), set to land mode
                 if (time.time() > timeout):
                     msg = connection.recv_match(type='GLOBAL_POSITION_INT', blocking=True)
                     if msg:
@@ -246,13 +252,13 @@ def april_tag_land(tag_size, use_display = True):
                         curr_yaw = hdg/180*math.pi/100
                         timeout = time.time() + .5
                         z_rot = rvec[2,0]
-                        print(f"x:{-x:.3f} y:{y:.3f} desr yaw: {target_yaw:.3f} curr yaw:{curr_yaw:.3f} z rot:{z_rot:.3f}", end="\r")
+                        print(f"x:{-x:.3f} y:{y:.3f} curr yaw:{curr_yaw:.3f} z rot:{z_rot:.3f}", end="\r")
                         timeout += 5
                         if z > align_height:
-                            delta_h = 1 + (z - align_height) / 1.5 # logarithmically approach precision landing height
-                            align(-y/2-y_offset,-x/2,delta_h,z_rot)
+                            delta_h = 1 + (z - align_height) / 1.5 # Calculate how much to descend, without going below precision landing height
+                            align(-y / 2 - y_offset, -x / 2, delta_h, z_rot)
                         elif (z > land_height):
-                            align(-y-y_offset,-x,z/3,z_rot)
+                            align(-y - y_offset, -x, z / 3, z_rot) # y_offset to account for box position
                         else:
                             print("\n")
                             set_mode("LAND")
@@ -281,6 +287,7 @@ def april_tag_land(tag_size, use_display = True):
 # loiter_time = float(input("Enter loiter time (s): "))
 
 target_distance = 10
+
 target_angle = 27
 target_alt = 15
 loiter_time = 1
