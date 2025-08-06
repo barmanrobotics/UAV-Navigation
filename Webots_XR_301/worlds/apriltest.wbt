@@ -79,7 +79,7 @@ xr301 {
     Camera {
       translation 0.125 0 -0.005
       rotation 0 1 0 1.5708
-      fieldOfView 1.15
+      fieldOfView 0.975
       width 640
       height 480
     }

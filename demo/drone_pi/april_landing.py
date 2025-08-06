@@ -68,7 +68,7 @@ def align(x, y, z, yaw):
         connection.target_system, 
         connection.target_component,
         mavutil.mavlink.MAV_FRAME_BODY_OFFSET_NED,  # NED frame
-        int(0b111111111000),  # type_mask to specify that we are setting position
+        int(0b100111111000),  # type_mask to specify that we are setting position
         x,  # North (meters)
         y,   # East (meters)
         z,   # Down (meters)
@@ -78,8 +78,8 @@ def align(x, y, z, yaw):
         0,            # acceleration_x (not used)
         0,            # acceleration_y (not used)
         0,            # acceleration_z (not used)
-        0,            # yaw (not used)
-        0             # yaw_rate (not used)
+        yaw,            # yaw
+        0             # yaw_rate
     )
 
 ## Picam code
@@ -157,13 +157,17 @@ detector = apriltag.Detector(options)
 header_size = struct.calcsize("=HH")
 
 start_time = time.time()
-yaw_timeout = 0 # sets a delay for the yaw command
+timeout = 0 # sets a delay for the yaw command
 
 yaw_set = False
 target_yaw = 0
 landed = False
+y_offset = .325 # account for april tag not aligned with box
+land_height = 2 # height to switch to landing mode
+align_height = 7 # height to start precision alignment
+
 while not landed:
-    # print(yaw_timeout, end="\r")
+    # print(timeout, end="\r")
 
     header = s.recv(header_size)
     if len(header) != header_size:
@@ -206,8 +210,8 @@ while not landed:
         #                                    flags=cv2.SOLVEPNP_ITERATIVE)
 
         # First create an apriltag_detection_info_t struct using your known parameters.
-        fx = 384.715
-        fy = fx
+        fx = camera_matrix_2[0,0]
+        fy = camera_matrix_2[1,1]
         camera_params = [fx, fy, x_res//2, y_res//2]
 
         M, init_error, final_error = detector.detection_pose(det, camera_params, tag_size)
@@ -236,7 +240,7 @@ while not landed:
 
             center = tuple([cx, cy])
             
-            draw_axis(gray_color, rvec, tvec, webots_cam_matrix, center)
+            draw_axis(gray_color, rvec, tvec, camera_matrix_2, center)
 
             # Draw box around tag
             for i in range(4):
@@ -245,28 +249,39 @@ while not landed:
                 cv2.line(gray_color, pt1, pt2, (0, 255, 0), 2)
 
 
-            if (time.time() > yaw_timeout):
+            if (time.time() > timeout):
                 msg = connection.recv_match(type='GLOBAL_POSITION_INT', blocking=True)
                 # msg = connection.recv_match(type='ATTITUDE', blocking=True)
                 if msg:
                     hdg = msg.hdg
                     curr_yaw = hdg/180*math.pi/100
-                    if not yaw_set:
-                        target_yaw = curr_yaw + rvec[2]
-                        # yaw_set = True
-                    yaw_timeout = time.time() + 5
-                    alt = msg.alt
+                    timeout = time.time() + .5
                     # set_yaw(target_yaw)
                     # make sure the drone is not moving
-                    msg = connection.recv_match(type='LOCAL_POSITION_NED', blocking=True)
 
-                    # print(f"{msg.vx} {msg.vy} {msg.vz}", end="\r")
-                    # make sure the drone is stationary before sending commands
-                    if (msg.vx > 1 or msg.vy > 1 or msg.vz > 1):
-                        break
-                    print(f"{-x:.3f} {y:.3f} {target_yaw} {curr_yaw} {hdg} {rvec[2]}                ", end="\r")
-                    if (z > 5):
-                        align(-y/1.1,-x/1.1,z/3,target_yaw)
+                    # if not yaw_set or not (curr_yaw < target_yaw + 0.1 and curr_yaw > target_yaw - 0.1):
+                    #     target_yaw = (curr_yaw + rvec[2])[0]
+                    #     set_yaw(target_yaw)
+                    #     yaw_set = True
+                    #     # timeout += 5
+                    #     print(f"setting yaw --- current: {curr_yaw}, desired: {target_yaw}", end="\r")
+                    #     break
+
+                    # msg = connection.recv_match(type='LOCAL_POSITION_NED', blocking=True)
+                    # # print(f"{msg.vx} {msg.vy} {msg.vz}", end="\r")
+                    # # make sure the drone is stationary before sending commands
+
+                    # if (msg.vx > 1 or msg.vy > 1 or msg.vz > 1):
+                    #     print("\nDrone still moving!\n")
+                    #     break
+                    z_rot = rvec[2,0]
+                    print(f"x:{-x:.3f} y:{y:.3f} desr yaw: {target_yaw:.3f} curr yaw:{curr_yaw:.3f} z rot:{z_rot:.3f}", end="\r")
+                    timeout += 5
+                    if z > align_height:
+                        delta_h = 1 + (z - align_height) / 1.5 # logarithmically approach precision landing height
+                        align(-y/2-y_offset,-x/2,delta_h,z_rot)
+                    elif (z > land_height):
+                        align(-y-y_offset,-x,z/3,z_rot)
                     else:
                         print("\n")
                         set_mode("LAND")
