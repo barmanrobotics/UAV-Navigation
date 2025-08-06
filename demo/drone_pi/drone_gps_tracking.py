@@ -23,7 +23,8 @@ def get_gps_info():
     
     # Extract latitude, longitude, and altitude from the message
     if msg:
-        print(f"{UP}lat: {msg.lat/1e7}{CLR}\n lon: {msg.lon/1e7}{CLR} \n alt: {msg.lat}{CLR} \n rel_alt: {msg.relative_alt}{CLR} \n heading: {msg.hdg}{CLR}")
+        # print(f"{UP}lat: {msg.lat/1e7}{CLR}\n lon: {msg.lon/1e7}{CLR} \n alt: {msg.lat}{CLR} \n rel_alt: {msg.relative_alt}{CLR} \n heading: {msg.hdg}{CLR}")
+        print(f"{msg.hdg} {msg.hdg*math.pi/180/100}                ", end="\r")
 
 def continuous_readout():
     while True:
