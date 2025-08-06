@@ -1,6 +1,8 @@
-# Author : Arnab Chatterjee
-# First written : 06/20/2025
-# Recent Update date: 06/20/2025
+# Bill Wang
+
+# Modified code from Arnab Chatterjee
+
+
 
 import time
 import cv2
@@ -41,6 +43,43 @@ def set_yaw(yaw_rad):
         connection.target_component,
         mavutil.mavlink.MAV_CMD_CONDITION_YAW,
         1, yaw, 10, 0, 0, 0, 0, 0
+    )
+
+def set_mode(mode):
+    mode_id = connection.mode_mapping().get(mode)
+    if mode_id is None:
+        print(f"Mode {mode} is not supported")
+        return False
+    connection.mav.set_mode_send(
+        connection.target_system,
+        mavutil.mavlink.MAV_MODE_FLAG_CUSTOM_MODE_ENABLED,
+        mode_id
+    )
+    while True:
+        ack = connection.recv_match(type='HEARTBEAT', blocking=True)
+        if ack.custom_mode == mode_id:
+            print(f"Mode changed to {mode}")
+            break
+        time.sleep(0.5)
+
+def align(x, y, z, yaw):
+    connection.mav.set_position_target_local_ned_send(
+        0,  # time_boot_ms, set to 0 as we are sending an instantaneous command
+        connection.target_system, 
+        connection.target_component,
+        mavutil.mavlink.MAV_FRAME_BODY_OFFSET_NED,  # NED frame
+        int(0b111111111000),  # type_mask to specify that we are setting position
+        x,  # North (meters)
+        y,   # East (meters)
+        z,   # Down (meters)
+        0,            # velocity_x
+        0,            # velocity_y
+        0,            # velocity_z
+        0,            # acceleration_x (not used)
+        0,            # acceleration_y (not used)
+        0,            # acceleration_z (not used)
+        0,            # yaw (not used)
+        0             # yaw_rate (not used)
     )
 
 ## Picam code
@@ -120,7 +159,10 @@ header_size = struct.calcsize("=HH")
 start_time = time.time()
 yaw_timeout = 0 # sets a delay for the yaw command
 
-while True:
+yaw_set = False
+target_yaw = 0
+landed = False
+while not landed:
     # print(yaw_timeout, end="\r")
 
     header = s.recv(header_size)
@@ -154,6 +196,7 @@ while True:
     gray_color = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
 
     detections = detector.detect(gray)
+
     for det in detections:
 
         # Estimate pose using corner points
@@ -203,15 +246,31 @@ while True:
 
 
             if (time.time() > yaw_timeout):
-                msg = connection.recv_match(type='ATTITUDE', blocking=True)
-                if(msg):
-                    curr_yaw = msg.yaw
-                    target_yaw = curr_yaw + rvec[2]
+                msg = connection.recv_match(type='GLOBAL_POSITION_INT', blocking=True)
+                # msg = connection.recv_match(type='ATTITUDE', blocking=True)
+                if msg:
+                    hdg = msg.hdg
+                    curr_yaw = hdg/180*math.pi/100
+                    if not yaw_set:
+                        target_yaw = curr_yaw + rvec[2]
+                        # yaw_set = True
                     yaw_timeout = time.time() + 5
-                    set_yaw(target_yaw)
-                    print(f"                           Desired yaw: {target_yaw}", end="\r")
-                    print(f"curr yaw: {curr_yaw}", end = "\r")
+                    alt = msg.alt
+                    # set_yaw(target_yaw)
+                    # make sure the drone is not moving
+                    msg = connection.recv_match(type='LOCAL_POSITION_NED', blocking=True)
 
+                    # print(f"{msg.vx} {msg.vy} {msg.vz}", end="\r")
+                    # make sure the drone is stationary before sending commands
+                    if (msg.vx > 1 or msg.vy > 1 or msg.vz > 1):
+                        break
+                    print(f"{-x:.3f} {y:.3f} {target_yaw} {curr_yaw} {hdg} {rvec[2]}                ", end="\r")
+                    if (z > 5):
+                        align(-y/1.1,-x/1.1,z/3,target_yaw)
+                    else:
+                        print("\n")
+                        set_mode("LAND")
+                        landed = True
 
             
 
