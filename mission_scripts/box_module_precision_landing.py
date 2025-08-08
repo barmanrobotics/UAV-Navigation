@@ -18,7 +18,7 @@ import pymavlink.dialects.v20.all as dialect
 # from picamera2 import Picamera2
 # from libcamera import controls
 
-tag_size = .5
+
 
 def april_tag_land(tag_size, use_display = True):
 
@@ -84,7 +84,7 @@ def april_tag_land(tag_size, use_display = True):
             down,   # Down (meters)
             0,            # velocity_x
             0,            # velocity_y
-            0,            # velocity_z
+            0,           # velocity_z
             0,            # acceleration_x (not used)
             0,            # acceleration_y (not used)
             0,            # acceleration_z (not used)
@@ -146,13 +146,18 @@ def april_tag_land(tag_size, use_display = True):
 
     timeout = 0 # sets a delay for the yaw command
 
-    yaw_set = False
     landed = False
-    y_offset = .32 # account for april tag not aligned with box
+    y_offset = .315 # account for april tag not aligned with box
     land_height = 2 # height to switch to landing mode
     align_height = 7 # height to start precision alignment
-
+    
+    start_time = time.time()
     while not landed:
+        # If timeed out, give up and land
+        # Need to think about better timeout behavior
+        if (time.time() - start_time) > 60:
+            set_mode("LAND")
+            land = True
         # print(timeout, end="\r")
 
         header = s.recv(header_size)
@@ -187,6 +192,8 @@ def april_tag_land(tag_size, use_display = True):
 
         detections = detector.detect(gray)
 
+        if len(detections) != 1:
+            continue
         for det in detections:
 
             ## OpenCV pnp solver
@@ -252,13 +259,20 @@ def april_tag_land(tag_size, use_display = True):
                         curr_yaw = hdg/180*math.pi/100
                         timeout = time.time() + .5
                         z_rot = rvec[2,0]
-                        print(f"x:{-x:.3f} y:{y:.3f} curr yaw:{curr_yaw:.3f} z rot:{z_rot:.3f}", end="\r")
-                        timeout += 5
-                        if z > align_height:
-                            delta_h = 1 + (z - align_height) / 1.5 # Calculate how much to descend, without going below precision landing height
-                            align(-y / 2 - y_offset, -x / 2, delta_h, z_rot)
-                        elif (z > land_height):
-                            align(-y - y_offset, -x, z / 3, z_rot) # y_offset to account for box position
+                        print(f"x:{-x:.3f} y:{y:.3f} curr yaw:{curr_yaw:.3f} z rot:{z_rot:.3f} time: {(time.time() - start_time):.3f}    ", end="\r")
+                        
+                        # if z > align_height:
+                        #     delta_h = 1 + (z - align_height) / 1.5 # Calculate how much to descend, without going below precision landing height
+                        #     align(-y / 2 - y_offset, -x / 2, delta_h, z_rot)
+                        # elif (z > land_height):
+                        error = 0.01
+                        if (z > land_height):
+                            align(-y - y_offset, -x, z/3, z_rot) # y_offset to account for box position
+                            timeout += 3
+                        # If not aligned at landing height, keep trying to align
+                        elif not (x < error and x > -error) and not (y < -y_offset - error and y > -y_offset + error) and not (z < error and z > -error):
+                            align(-y - y_offset, -x, 0, z_rot)
+                            timeout += 0.2
                         else:
                             print("\n")
                             set_mode("LAND")
@@ -278,6 +292,7 @@ def april_tag_land(tag_size, use_display = True):
 
     s.close()
     print("\nSocket closed")
+    print(f"Elapsed time: {(time.time() - start_time):.3f}")
 
 # Define the distance to fly (in meters) and the direction (angle from north in degrees)
 # Angle is in degrees: 0 = North, 90 = East, 180 = South, 270 = West
@@ -529,14 +544,14 @@ takeoff(target_alt)
 lat_takeoff, lon_takeoff = get_location()
 
 # Now fly to the target relative location
-fly_relative_distance(target_distance, target_angle, target_alt)
+# fly_relative_distance(target_distance, target_angle, target_alt)
 
 # Begin loiter
 time.sleep(loiter_time)
 
 #return to launch and end mission
-yaw_return(lat_box, lon_box)
+# yaw_return(lat_box, lon_box)
 # yaw_return(lat_takeoff, lon_takeoff)
 
 
-april_tag_land(tag_size, False)
+april_tag_land(.5, False)
