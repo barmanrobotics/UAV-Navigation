@@ -1,0 +1,92 @@
+#VRML_SIM R2025a utf8
+
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023a/projects/objects/backgrounds/protos/TexturedBackground.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023a/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023a/projects/objects/road/protos/StraightRoadSegment.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023a/projects/objects/floors/protos/Floor.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023a/projects/appearances/protos/Grass.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023a/projects/objects/advertising_board/protos/AdvertisingBoard.proto"
+EXTERNPROTO "../protos/xr301.proto"
+EXTERNPROTO "../protos/tower_with_cone.proto"
+EXTERNPROTO "../protos/box_module.proto"
+EXTERNPROTO "../protos/AprilTag.proto"
+
+WorldInfo {
+  title "Iris Ardupilot"
+  basicTimeStep 2
+  FPS 20
+}
+Viewpoint {
+  orientation -0.3107166209615762 0.24840053033281756 0.9174706305863939 1.9180048802088157
+  position 1.1338535634397044 -1.6716723705915115 2.054291106878732
+  follow "xr301"
+  followSmoothness 0.01
+}
+TexturedBackground {
+}
+TexturedBackgroundLight {
+}
+Floor {
+  size 300 100
+  appearance Grass {
+  }
+}
+AdvertisingBoard {
+  translation 13.1012 17.8267 0
+  rotation 0 0 1 -1.469
+  frontTexture [
+    "../../../../../Tools/autotest/web-firmware/images/logo.png"
+  ]
+  backTexture [
+    "../../../../../Tools/autotest/web-firmware/images/logo.png"
+  ]
+  displayWidth 16.28
+  displayHeight 6
+  poleNumber 2
+  poleType "H-shape"
+  poleHeight 10
+}
+StraightRoadSegment {
+  translation -15 0.3 0.01
+  rotation 0 0 1 0.105
+  width 16.5
+  rightBorder FALSE
+  leftBorder FALSE
+  length 140
+}
+box_module {
+  hidden linearVelocity_0 -1.0301146148821056e-11 1.0272617356550373e-11 2.20358866992641e-18
+  hidden angularVelocity_0 -0.00044411339946547583 -0.0004453467771702954 7.271716334913394e-20
+  translation 0.5710259999999451 1.4921200000000276 -2.170217187113461e-06
+  rotation 0.5768163730409259 0.5776170320292274 0.5776170323853497 2.0951953609407945
+}
+xr301 {
+  hidden linearVelocity_0 -0.00010777428767917507 8.866304138620336e-05 -3.1481863445033494e-09
+  hidden angularVelocity_0 -0.0035225884225599576 -0.004281882077664993 -1.2378067567737383e-09
+  translation -0.0018223221651171395 -0.0012154755322666252 0.21097570520382505
+  rotation -2.081985837814133e-06 1.832281154824223e-06 0.999999999996154 -3.0750288784693836
+  controller "ardupilot_vehicle_controller"
+  controllerArgs [
+    "--motors"
+    "m1_motor, m2_motor, m3_motor, m4_motor"
+    "--camera"
+    "camera"
+    "--camera-port"
+    "5599"
+  ]
+  extensionSlot [
+    Camera {
+      translation 0.125 0 -0.005
+      rotation 0 1 0 1.5708
+      fieldOfView 0.975
+      width 640
+      height 480
+    }
+  ]
+}
+tower_with_cone {
+}
+AprilTag {
+  translation 0.57 1.89 0.03
+  rotation 0 0 1 4.692820414042842e-06
+}

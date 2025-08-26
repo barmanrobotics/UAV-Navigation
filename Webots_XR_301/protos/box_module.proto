@@ -1,0 +1,46 @@
+#VRML_SIM R2025a utf8
+# Box module
+
+PROTO box_module [
+  field SFVec3f    translation   0 0 0
+  field SFRotation rotation      0 1 0 0
+  field SFFloat    mass                0.2            # Defines the mass of the wooden box in kg. A value smaller or equal to 0 remove the physics of the wooden box.
+  field SFString   name          "box module"
+]
+{
+  Solid {
+    translation IS translation
+    rotation IS rotation
+    name IS name
+    mass IS mass
+    children [
+      DEF BOXMOD Shape {
+        appearance PBRAppearance {
+          baseColor 1 1 1
+          baseColorMap ImageTexture {
+                    url "textures/CF.png"
+          }
+          roughness 0.5
+          metalness 0.1
+        }
+        geometry Mesh {
+          url "meshes/box_module.obj"
+        }
+        castShadows TRUE
+      }
+    ]
+    boundingObject Mesh{
+          url "meshes/bounding_box_module.obj"
+    }
+    physics Physics {
+      density -1
+      mass IS mass
+      centerOfMass IS centerOfMass
+      inertiaMatrix [ 0.000023 0.000023 0.000023, 0 0 0 ]
+      damping Damping {
+        linear IS linearDamping
+        angular IS angularDamping
+      }
+    }
+  }
+}
