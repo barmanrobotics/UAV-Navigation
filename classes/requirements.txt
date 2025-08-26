@@ -1,0 +1,20 @@
+# UAV Navigation Classes Dependencies
+
+# MAVLink communication
+pymavlink>=2.4.37
+
+# Computer vision and ArUco detection
+opencv-python>=4.5.0
+opencv-contrib-python>=4.5.0
+
+# Numerical operations
+numpy>=1.21.0
+
+# GPIO control (for Tower class on Raspberry Pi)
+RPi.GPIO>=0.7.0
+
+# Optional: For better performance on Raspberry Pi
+# picamera2>=0.3.0  # Uncomment if using Raspberry Pi Camera Module 2
+
+# Optional: For additional MAVLink features
+# pyserial>=3.5  # Uncomment if using serial connections
