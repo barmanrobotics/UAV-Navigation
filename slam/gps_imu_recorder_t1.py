@@ -9,16 +9,11 @@ print(f"Waiting for heartbeat on {port}...")
 connection.wait_heartbeat()
 print(f"Heartbeat received from system {connection.target_system}, component {connection.target_component}")
 
-# connection = mavutil.mavlink_connection('udpin:localhost:{port}}')
-
-# connection.wait_heartbeat()
-# print("Connected.")
-
 def get_gps_info():
     msg = connection.recv_match(type='GLOBAL_POSITION_INT', blocking=True)
     
     if msg:
-        lat, lon, alt, rel_alt, hdg = msg.lat/1e7, msg.lon/1e7, msg.alt/1000.0, msg.relative_alt/1000.0, msg.hdg
+        lat, lon, alt, rel_altHopk, hdg = msg.lat/1e7, msg.lon/1e7, msg.alt/1000.0, msg.relative_alt/1000.0, msg.hdg
 
 def continuous_readout():
     while True:
